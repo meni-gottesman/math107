@@ -6,7 +6,7 @@ An interactive, single-file study workspace for Occidental College **MATH 107
 **Live site:** https://meni-gottesman.github.io/math107
 
 ## What's inside
-- **7 units / 28 subtopics** — each with a lesson cheat-sheet, ranked videos, a
+- **An Algebra Toolkit on-ramp + 7 units / 32 subtopics** — each with a lesson cheat-sheet, ranked videos, a
   full worksheet, and a worked answer key.
 - **10 assessments** — a diagnostic, seven unit tests, a midterm (Units 1–4),
   and a cumulative final, each with a rubric and answer key.

@@ -18,12 +18,12 @@
 
 <style>
 :root{
-  --ink:#16243c; --ink-soft:#41506b; --ink-faint:#7e8aa1;
+  --ink:#16243c; --ink-soft:#41506b; --ink-faint:#5d6982;
   --teal:#0e7c7b; --cyan:#127d92; --cyan-bright:#1593a8;
   --paper:#faf9f5; --panel:#ffffff; --panel-2:#f3f5f9;
   --line:#e6eaf1; --line-strong:#d3dae6;
   --grid:#eef1f7;
-  --good:#2f8f5b; --good-bg:#e8f3ec; --amber:#bd8324; --amber-bg:#f8f0e0;
+  --good:#2f8f5b; --good-bg:#e8f3ec; --amber:#8a5d12; --amber-bg:#f8f0e0;
   --shadow:0 1px 2px rgba(20,30,50,.04),0 6px 22px rgba(20,30,50,.06);
   --shadow-lg:0 10px 40px rgba(20,30,50,.14);
   --radius:14px; --radius-sm:9px;
@@ -33,7 +33,7 @@
   --font-mono:'IBM Plex Mono',ui-monospace,monospace;
 }
 [data-theme="dark"]{
-  --ink:#e9edf5; --ink-soft:#b3bdd0; --ink-faint:#7a86a0;
+  --ink:#e9edf5; --ink-soft:#b3bdd0; --ink-faint:#99a3b8;
   --teal:#4fc5c0; --cyan:#5cc6d8; --cyan-bright:#6dd2e3;
   --paper:#0e1626; --panel:#152034; --panel-2:#1b2840;
   --line:#243352; --line-strong:#2d3f63;
@@ -51,6 +51,9 @@ body{
 a{color:var(--cyan-bright); text-decoration:none}
 a:hover{text-decoration:underline}
 :focus-visible{outline:2.5px solid var(--cyan-bright); outline-offset:2px; border-radius:4px}
+.skip{position:absolute; left:-9999px; top:8px; z-index:100; background:var(--ink); color:#fff; padding:10px 16px; border-radius:8px; font-weight:600; box-shadow:var(--shadow-lg)}
+.skip:focus{left:12px}
+.visually-hidden{position:absolute!important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0}
 
 /* ---------- Top bar ---------- */
 .topbar{
@@ -311,16 +314,37 @@ ol.problems li .pb{flex:1 1 auto}
 @media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
 
 @media print{
-  .topbar,.sidebar,.scrim,.pager,.progress-chips,.tabs,.notes,.key-gate,.vactions,.embed{display:none!important}
+  /* Force a light, ink-on-paper palette no matter the on-screen theme */
+  :root,[data-theme="dark"]{
+    --ink:#000; --ink-soft:#1c1c1c; --ink-faint:#444; --paper:#fff; --panel:#fff; --panel-2:#f3f3f3;
+    --line:#cfcfcf; --line-strong:#9a9a9a; --grid:transparent; --teal:#0a5a59; --cyan-bright:#0a5a59;
+    --good:#1d6b3f; --amber:#7a5210;
+  }
+  html,body{background:#fff!important; color:#000!important}
+  .skip,.topbar,.sidebar,.scrim,.pager,.progress-chips,.tabs,.notes,.key-gate,.vactions,.embed,.score-box,.hamburger,.meta-row .btn-sm,button[onclick]{display:none!important}
   .layout{display:block} .content{max-width:none; padding:0; background:none}
+  .content-inner{background:#fff}
   .panel-body{padding:0}
+  /* Hero is decorative — print as a plain titled band, not a heavy gradient */
+  .hero{background:#fff!important; color:#000!important; box-shadow:none; border:1px solid #ccc}
+  .hero::before,.hero::after{display:none!important}
+  .hero .h-eye,.hero h2,.hero p{color:#000!important}
+  /* Always print the grading rubric even though it is a collapsed <details> on screen */
+  details{display:block!important} details>summary{display:none!important}
+  /* Keep problems, parts, sections, tables, and callouts from splitting across pages */
+  ol.problems li,.wpart,.tsection,table.ref,.callout,.card,.rm-unit{break-inside:avoid}
+  .cs h4,.wpart h5,.tsection h5{break-after:avoid}
+  .sol{break-before:page}            /* worked answer key starts on a fresh page */
+  a[href]:after{content:""}          /* suppress URL echoes */
+  table.ref thead th{-webkit-print-color-adjust:exact; print-color-adjust:exact}
 }
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 
 <header class="topbar">
-  <button class="iconbtn hamburger" id="menuBtn" aria-label="Toggle menu">
+  <button class="iconbtn hamburger" id="menuBtn" aria-label="Toggle menu" aria-expanded="false" aria-controls="sidebar">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
   </button>
   <div class="brand">
@@ -338,9 +362,9 @@ ol.problems li .pb{flex:1 1 auto}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
       <input id="searchInput" type="search" placeholder="Search topics…" aria-label="Search topics" autocomplete="off"/>
     </div>
-    <div class="ring" title="Overall progress">
-      <svg viewBox="0 0 38 38"><circle class="track" cx="19" cy="19" r="16"/><circle class="fill" id="ringFill" cx="19" cy="19" r="16" stroke-dasharray="100.5" stroke-dashoffset="100.5"/></svg>
-      <div><div class="pct" id="ringPct">0%</div><div class="lbl">complete</div></div>
+    <div class="ring" id="ringWrap" role="img" aria-label="Course progress: 0 percent complete" title="Overall progress">
+      <svg viewBox="0 0 38 38" aria-hidden="true"><circle class="track" cx="19" cy="19" r="16"/><circle class="fill" id="ringFill" cx="19" cy="19" r="16" stroke-dasharray="100.5" stroke-dashoffset="100.5"/></svg>
+      <div aria-hidden="true"><div class="pct" id="ringPct">0%</div><div class="lbl">complete</div></div>
     </div>
     <button class="iconbtn" id="themeBtn" aria-label="Toggle dark mode" title="Toggle dark mode">
       <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
@@ -352,8 +376,8 @@ ol.problems li .pb{flex:1 1 auto}
 </header>
 
 <div class="layout">
-  <aside class="sidebar" id="sidebar"></aside>
-  <main class="content"><div class="content-inner" id="view"></div></main>
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Course navigation"></aside>
+  <main class="content" id="main" tabindex="-1"><div class="content-inner" id="view"></div></main>
 </div>
 <div class="scrim" id="scrim"></div>
 <div class="toast" id="toast"></div>
@@ -405,14 +429,310 @@ const LEONARD = 'https://www.youtube.com/playlist?list=PLDesaqWTN6ESsmwELdrzhcGi
 const COURSE = {
   units: [
     {
-      id:'u1', n:'01', name:'Functions', open:true,
+      id:'u0', n:'00', name:'Algebra Toolkit', open:true,
+      subtopics:[
+        {
+          id:'0.1', name:'Fractions, Signs & Order of Operations',
+          blurb: R`Master fraction arithmetic, signed-number rules, distributing a negative, and PEMDAS so you can evaluate any expression — the engine behind every later simplification, including the difference quotient in $1.3$.`,
+          videos:[
+            {rank:1, t:'Fractions Basic Introduction - Adding, Subtracting, Multiplying & Dividing Fractions', ch:'The Organic Chemistry Tutor', id:'GvLIEiqxS6s', note:'Best first watch — clear, worked examples of fractions and signed numbers for a rusty start.'},
+            {rank:2, t:'Practice these skills — interactive drills', ch:'Khan Academy', url:'https://www.khanacademy.org/math/pre-algebra', note:'Drill with instant feedback until the steps feel automatic.'}
+          ],
+          cs: R`<h4>Fractions: the four operations</h4>
+<p>A fraction $\dfrac{a}{b}$ means "$a$ parts out of $b$." The bottom number $b$ (the <strong>denominator</strong>) can never be $0$.</p>
+<div class="callout formula"><span class="co-label">Formula</span>
+<ul>
+<li><strong>Add/subtract (same denominator):</strong> $\dfrac{a}{c}\pm\dfrac{b}{c}=\dfrac{a\pm b}{c}$ — keep the bottom, combine the tops.</li>
+<li><strong>Add/subtract (different denominators):</strong> rewrite both over the <strong>LCD</strong> (least common denominator) first, then combine tops.</li>
+<li><strong>Multiply:</strong> $\dfrac{a}{b}\cdot\dfrac{c}{d}=\dfrac{ac}{bd}$ — straight across, top times top and bottom times bottom.</li>
+<li><strong>Divide:</strong> $\dfrac{a}{b}\div\dfrac{c}{d}=\dfrac{a}{b}\cdot\dfrac{d}{c}$ — multiply by the <strong>reciprocal</strong> (flip the second fraction).</li>
+</ul>
+</div>
+<p><strong>Finding the LCD.</strong> The LCD is the smallest number both denominators divide into. For $\dfrac{1}{6}$ and $\dfrac{1}{4}$, multiples of $6$ are $6,12,18,\dots$ and of $4$ are $4,8,12,\dots$, so the LCD is $12$. Multiply each fraction, top and bottom, by whatever turns its denominator into $12$.</p>
+<p><strong>Simplifying.</strong> Divide top and bottom by the same number until they share no common factor: $\dfrac{12}{18}=\dfrac{12\div 6}{18\div 6}=\dfrac{2}{3}$. Always simplify the final answer.</p>
+
+<h4>Signed numbers (positives and negatives)</h4>
+<table class="ref"><thead><tr><th>Situation</th><th>Rule</th><th>Example</th></tr></thead><tbody>
+<tr><td>Add same signs</td><td>add, keep the sign</td><td>$-3+(-5)=-8$</td></tr>
+<tr><td>Add different signs</td><td>subtract, keep sign of the bigger size</td><td>$-3+8=5$</td></tr>
+<tr><td>Subtract</td><td>add the opposite</td><td>$4-(-6)=4+6=10$</td></tr>
+<tr><td>Multiply / divide</td><td>same signs $\to$ positive; different $\to$ negative</td><td>$(-2)(-5)=10$, $\ \dfrac{-12}{3}=-4$</td></tr>
+</tbody></table>
+
+<h4>Distributing a negative sign</h4>
+<div class="callout"><span class="co-label">Key idea</span>A minus sign in front of parentheses flips the sign of <em>every</em> term inside: $-(a-b)=-a+b$. Think of it as multiplying each inside term by $-1$.</div>
+<p>Example: $-(2x-5+y)=-2x+5-y$. Every single term changed sign, not just the first.</p>
+
+<h4>Order of operations (PEMDAS)</h4>
+<div class="callout formula"><span class="co-label">Formula</span><strong>P</strong>arentheses, <strong>E</strong>xponents, <strong>M</strong>ultiplication and <strong>D</strong>ivision (left to right), <strong>A</strong>ddition and <strong>S</strong>ubtraction (left to right).</div>
+<p>"MD" is one step done left to right (whichever comes first), and "AS" is one step done left to right. A fraction bar acts like invisible parentheses: simplify the whole top and whole bottom before dividing.</p>
+
+<h4>Worked example (substitution + PEMDAS)</h4>
+<p>Evaluate $\dfrac{a^2-b}{a-b}$ when $a=-3$ and $b=5$.</p>
+<ul>
+<li><strong>Substitute</strong> using parentheses: $\dfrac{(-3)^2-(5)}{(-3)-(5)}$.</li>
+<li><strong>Top:</strong> exponent first, $(-3)^2=9$, then $9-5=4$.</li>
+<li><strong>Bottom:</strong> $-3-5=-8$.</li>
+<li><strong>Divide:</strong> $\dfrac{4}{-8}=-\dfrac{1}{2}$.</li>
+</ul>
+<p>Answer: $-\dfrac{1}{2}$. The parentheses around each substituted value are what keep $(-3)^2=9$ from being miscomputed as $-9$.</p>
+
+<div class="callout warn"><span class="co-label">Common errors</span>
+<ul>
+<li><strong>Adding bottoms:</strong> $\dfrac{1}{2}+\dfrac{1}{3}\ne\dfrac{2}{5}$. Never add denominators; get an LCD first ($\dfrac{3}{6}+\dfrac{2}{6}=\dfrac{5}{6}$).</li>
+<li><strong>Forgetting to distribute the full negative:</strong> $-(x-4)$ is $-x+4$, <em>not</em> $-x-4$.</li>
+<li><strong>$-3^2$ vs $(-3)^2$:</strong> without parentheses, $-3^2=-9$ (exponent before the sign); with them, $(-3)^2=9$. When substituting a negative, always write parentheses.</li>
+<li><strong>Left-to-right slips:</strong> $8-3+2=7$ (go left to right), not $8-5=3$. Same for $\div$ and $\times$.</li>
+<li><strong>Flipping the wrong fraction when dividing:</strong> in $\dfrac{a}{b}\div\dfrac{c}{d}$ you flip only the <em>second</em> fraction.</li>
+</ul>
+</div>
+
+<div class="callout"><span class="co-label">Used later</span>These exact skills power simplifying the difference quotient in $1.3$ (combining fractions over a common denominator and distributing the negative from $f(x+h)-f(x)$), and they appear in every later computation — solving equations, factoring, and evaluating functions.</div>`,
+          ws:[
+            {part: R`A — Add and subtract fractions (find the LCD)`, items: items(R`$\dfrac{3}{7}+\dfrac{2}{7}$ @@ $\dfrac{5}{6}-\dfrac{1}{6}$ @@ $\dfrac{1}{2}+\dfrac{1}{3}$ @@ $\dfrac{3}{4}-\dfrac{1}{6}$ @@ $\dfrac{5}{8}+\dfrac{1}{12}$ @@ $\dfrac{7}{10}-\dfrac{2}{15}$`)},
+            {part: R`B — Multiply, divide, and simplify fractions`, items: items(R`$\dfrac{2}{3}\cdot\dfrac{6}{5}$ @@ $\dfrac{4}{9}\cdot\dfrac{3}{8}$ @@ $\dfrac{3}{4}\div\dfrac{9}{8}$ @@ $\dfrac{5}{6}\div\dfrac{10}{3}$ @@ Simplify $\dfrac{18}{24}$. @@ $\dfrac{2}{3}\div 4$ (write $4$ as $\dfrac{4}{1}$ first).`)},
+            {part: R`C — Signed-number arithmetic`, items: items(R`$-7+(-4)$ @@ $-9+15$ @@ $6-(-8)$ @@ $(-3)(-7)$ @@ $\dfrac{-20}{-5}$ @@ $-2+(-5)-(-3)$`)},
+            {part: R`D — Distribute the negative sign`, items: items(R`$-(x-9)$ @@ $-(2a+3b-1)$ @@ $5-(x-4)$ @@ $-(3-2y)+7$ @@ Find the error: a student wrote $-(x-6)=-x-6$. Correct it. @@ Simplify $8-(2x+5)-(x-3)$.`)},
+            {part: R`E — Order of operations (PEMDAS)`, items: items(R`$8-3+2$ @@ $4+3\cdot 5$ @@ $20\div 4\cdot 2$ @@ $2+3(4-1)^2$ @@ $\dfrac{6+2\cdot 3}{4-1}$ @@ Find the error: a student computed $-3^2=9$. Is that right? Explain. @@ $(-2)^3+5\cdot(-1)$`)},
+            {part: R`F — Evaluate by substitution`, items: items(R`Evaluate $2x+5$ when $x=-3$. @@ Evaluate $x^2-4x$ when $x=-2$. @@ Evaluate $\dfrac{a-b}{a+b}$ when $a=2,\ b=-6$. @@ Evaluate $-(x-y)$ when $x=4,\ y=9$. @@ Evaluate $\dfrac{(x+h)^2-x^2}{h}$ when $x=3,\ h=2$ (a preview of the difference quotient).`)}
+          ],
+          key:[
+            {part: R`A — Add and subtract fractions (find the LCD)`, sols: items(R`Same denominator, add tops: $\dfrac{3+2}{7}=\dfrac{5}{7}$. <strong>$\dfrac{5}{7}$</strong> @@ $\dfrac{5-1}{6}=\dfrac{4}{6}=\dfrac{2}{3}$. <strong>$\dfrac{2}{3}$</strong> @@ LCD $=6$: $\dfrac{3}{6}+\dfrac{2}{6}=\dfrac{5}{6}$. <strong>$\dfrac{5}{6}$</strong> @@ LCD $=12$: $\dfrac{9}{12}-\dfrac{2}{12}=\dfrac{7}{12}$. <strong>$\dfrac{7}{12}$</strong> @@ LCD $=24$: $\dfrac{15}{24}+\dfrac{2}{24}=\dfrac{17}{24}$. <strong>$\dfrac{17}{24}$</strong> @@ LCD $=30$: $\dfrac{21}{30}-\dfrac{4}{30}=\dfrac{17}{30}$. <strong>$\dfrac{17}{30}$</strong>`)},
+            {part: R`B — Multiply, divide, and simplify fractions`, sols: items(R`Straight across: $\dfrac{2\cdot 6}{3\cdot 5}=\dfrac{12}{15}=\dfrac{4}{5}$. <strong>$\dfrac{4}{5}$</strong> @@ $\dfrac{4\cdot 3}{9\cdot 8}=\dfrac{12}{72}=\dfrac{1}{6}$. <strong>$\dfrac{1}{6}$</strong> @@ Flip the second: $\dfrac{3}{4}\cdot\dfrac{8}{9}=\dfrac{24}{36}=\dfrac{2}{3}$. <strong>$\dfrac{2}{3}$</strong> @@ $\dfrac{5}{6}\cdot\dfrac{3}{10}=\dfrac{15}{60}=\dfrac{1}{4}$. <strong>$\dfrac{1}{4}$</strong> @@ Divide top and bottom by $6$: $\dfrac{18\div 6}{24\div 6}=\dfrac{3}{4}$. <strong>$\dfrac{3}{4}$</strong> @@ $\dfrac{2}{3}\div\dfrac{4}{1}=\dfrac{2}{3}\cdot\dfrac{1}{4}=\dfrac{2}{12}=\dfrac{1}{6}$. <strong>$\dfrac{1}{6}$</strong>`)},
+            {part: R`C — Signed-number arithmetic`, sols: items(R`Same sign, add and keep it: <strong>$-11$</strong>. @@ Different signs, subtract $15-9=6$, keep the bigger sign (positive): <strong>$6$</strong>. @@ Subtract becomes add the opposite: $6+8=$ <strong>$14$</strong>. @@ Same signs (both negative) $\to$ positive: <strong>$21$</strong>. @@ Same signs $\to$ positive: $\dfrac{-20}{-5}=$ <strong>$4$</strong>. @@ $-2+(-5)=-7$, then $-7-(-3)=-7+3=$ <strong>$-4$</strong>.`)},
+            {part: R`D — Distribute the negative sign`, sols: items(R`Flip every term: <strong>$-x+9$</strong>. @@ Each term changes sign: <strong>$-2a-3b+1$</strong>. @@ $5-(x-4)=5-x+4=$ <strong>$-x+9$</strong> (or $9-x$). @@ $-(3-2y)+7=-3+2y+7=$ <strong>$2y+4$</strong>. @@ Error: only the first term was flipped. The $-6$ must also change sign. Correct: <strong>$-x+6$</strong>. @@ $8-(2x+5)-(x-3)=8-2x-5-x+3=$ <strong>$-3x+6$</strong>.`)},
+            {part: R`E — Order of operations (PEMDAS)`, sols: items(R`Left to right: $8-3=5$, then $5+2=$ <strong>$7$</strong>. @@ Multiply first: $3\cdot 5=15$, then $4+15=$ <strong>$19$</strong>. @@ Left to right (M and D equal rank): $20\div 4=5$, then $5\cdot 2=$ <strong>$10$</strong>. @@ Parentheses $4-1=3$, exponent $3^2=9$, times $3$ is $27$, then $2+27=$ <strong>$29$</strong>. @@ Top: $6+2\cdot 3=6+6=12$. Bottom: $4-1=3$. Divide: $\dfrac{12}{3}=$ <strong>$4$</strong>. @@ Not right. Without parentheses the exponent applies only to $3$, so $-3^2=-(3^2)=-9$. It would equal $9$ only if written $(-3)^2$. <strong>$-9$</strong>. @@ $(-2)^3=-8$ and $5\cdot(-1)=-5$, so $-8+(-5)=$ <strong>$-13$</strong>.`)},
+            {part: R`F — Evaluate by substitution`, sols: items(R`$2(-3)+5=-6+5=$ <strong>$-1$</strong>. @@ $(-2)^2-4(-2)=4+8=$ <strong>$12$</strong>. @@ $\dfrac{2-(-6)}{2+(-6)}=\dfrac{8}{-4}=$ <strong>$-2$</strong>. @@ $-(4-9)=-(-5)=$ <strong>$5$</strong>. @@ Top: $(3+2)^2-3^2=25-9=16$. Bottom: $h=2$. So $\dfrac{16}{2}=$ <strong>$8$</strong>.`)}
+          ]
+        },
+        {
+          id:'0.2', name:'Exponent & Radical Rules',
+          blurb: R`The rules that let you combine, simplify, and rewrite powers and roots — including negative, zero, and fractional exponents — and convert freely between radical form like $\sqrt[3]{x}$ and exponent form like $x^{1/3}$.`,
+          videos:[
+            {rank:1, t:'Properties of Exponents - Algebra 2', ch:'The Organic Chemistry Tutor', id:'etMK3xViMAc', note:'Best first watch — every exponent rule with worked examples.'},
+            {rank:2, t:'Practice these skills — interactive drills', ch:'Khan Academy', url:'https://www.khanacademy.org/math/algebra-basics', note:'Drill with instant feedback until the steps feel automatic.'}
+          ],
+          cs: R`<h4>What an exponent means</h4>
+<p>An exponent is a shortcut for repeated multiplication. In $b^n$, the <strong>base</strong> $b$ is the thing being multiplied and the <strong>exponent</strong> $n$ counts how many copies. So $2^3 = 2\cdot 2\cdot 2 = 8$. Every rule below comes from this one idea — if you ever forget a rule, write the base out the long way and count.</p>
+
+<div class="callout formula"><span class="co-label">Formula</span>The exponent rules (assume bases are not zero where needed):
+<ul>
+<li><strong>Product rule</strong> (same base, multiply): $b^m \cdot b^n = b^{m+n}$ — <em>add</em> the exponents.</li>
+<li><strong>Quotient rule</strong> (same base, divide): $\dfrac{b^m}{b^n} = b^{m-n}$ — <em>subtract</em> the exponents.</li>
+<li><strong>Power rule</strong> (power of a power): $(b^m)^n = b^{mn}$ — <em>multiply</em> the exponents.</li>
+<li><strong>Power of a product</strong>: $(ab)^n = a^n b^n$.</li>
+<li><strong>Power of a quotient</strong>: $\left(\dfrac{a}{b}\right)^n = \dfrac{a^n}{b^n}$.</li>
+<li><strong>Zero exponent</strong>: $b^0 = 1$ (for $b \ne 0$).</li>
+<li><strong>Negative exponent</strong>: $b^{-n} = \dfrac{1}{b^n}$ — a negative exponent means "reciprocal," NOT a negative number.</li>
+</ul>
+</div>
+
+<h4>Why $b^0 = 1$ and why $b^{-n}$ flips</h4>
+<p>Follow the pattern $2^3=8,\ 2^2=4,\ 2^1=2$ — each step divides by $2$. Keep going: $2^0 = 1$, then $2^{-1} = \tfrac12$, then $2^{-2} = \tfrac14$. The quotient rule agrees: $\dfrac{b^2}{b^2} = b^{2-2} = b^0$, and that fraction is also $1$. And $\dfrac{b^2}{b^5} = b^{2-5} = b^{-3}$, which equals $\dfrac{1}{b^3}$.</p>
+
+<h4>Negative exponents: move and flip</h4>
+<p>A factor with a negative exponent moves across the fraction bar and the exponent turns positive. $\dfrac{x^{-2}}{1} = \dfrac{1}{x^2}$, and $\dfrac{1}{x^{-2}} = x^2$. Only the factor that carries the negative exponent moves — not the whole expression.</p>
+
+<h4>Radicals and fractional (rational) exponents</h4>
+<p>A radical is a root: $\sqrt{x}$ asks "what squared gives $x$," and $\sqrt[n]{x}$ asks "what to the $n$ gives $x$." The number $n$ is the <strong>index</strong> (a plain square root has index $2$). Roots are just fractional exponents.</p>
+<div class="callout formula"><span class="co-label">Formula</span>$b^{1/n} = \sqrt[n]{b}$  and  $b^{m/n} = \sqrt[n]{b^{\,m}} = \left(\sqrt[n]{b}\right)^{m}$. <br>Read the fraction as <strong>"root on the bottom, power on the top."</strong> Example: $8^{2/3} = \left(\sqrt[3]{8}\right)^2 = 2^2 = 4$.</div>
+
+<h4>Simplifying a square root</h4>
+<p>To simplify $\sqrt{N}$, pull out perfect squares. Factor $N$ so one factor is the largest perfect square you can find, then take its root outside.</p>
+<table class="ref"><thead><tr><th>Step</th><th>Example: $\sqrt{72}$</th></tr></thead><tbody>
+<tr><td>Find largest perfect-square factor</td><td>$72 = 36 \cdot 2$</td></tr>
+<tr><td>Split the radical</td><td>$\sqrt{36}\cdot\sqrt{2}$</td></tr>
+<tr><td>Take the perfect-square root out</td><td>$6\sqrt{2}$</td></tr>
+</tbody></table>
+<p>For variables under a root, divide the exponent by the index: $\sqrt{x^{10}} = x^{5}$ (because $10/2 = 5$), and $\sqrt[3]{x^{12}} = x^{4}$.</p>
+
+<div class="callout"><span class="co-label">Worked example</span>Simplify $\dfrac{(2x^3)^2 \cdot x^{-4}}{x^{0}}$ completely.<br>
+Step 1, power of a product on top: $(2x^3)^2 = 2^2 (x^3)^2 = 4x^{6}$.<br>
+Step 2, the bottom: $x^0 = 1$, so it disappears.<br>
+Step 3, multiply the top: $4x^{6}\cdot x^{-4} = 4x^{6+(-4)} = 4x^{2}$.<br>
+Answer: <strong>$4x^2$</strong>.</div>
+
+<div class="callout"><span class="co-label">Worked example</span>Write $\dfrac{1}{\sqrt[3]{x^{2}}}$ as a single power of $x$.<br>
+Root on bottom is index $3$, power on top is $2$: $\sqrt[3]{x^2} = x^{2/3}$. The reciprocal flips the sign: $\dfrac{1}{x^{2/3}} = x^{-2/3}$.<br>
+Answer: <strong>$x^{-2/3}$</strong>.</div>
+
+<div class="callout warn"><span class="co-label">Common errors</span>
+<ul>
+<li><strong>Adding exponents when you should multiply.</strong> $(x^3)^2 = x^{6}$, not $x^5$. Power of a power multiplies; only a product of like bases adds.</li>
+<li><strong>Treating a negative exponent as a negative number.</strong> $2^{-3} = \tfrac18$, a positive number — not $-8$ and not $-6$.</li>
+<li><strong>$b^0 = 0$.</strong> No: any nonzero base to the zero power is $1$.</li>
+<li><strong>$x^2 \cdot x^3 = x^6$.</strong> No — same base, so <em>add</em>: $x^{5}$. Multiplying the exponents is the power rule, a different situation.</li>
+<li><strong>Splitting a root over a sum.</strong> $\sqrt{a+b} \ne \sqrt{a}+\sqrt{b}$. The product rule $\sqrt{ab}=\sqrt a\sqrt b$ works only for multiplication, never for $+$ or $-$.</li>
+<li><strong>Leaving a root unsimplified.</strong> $\sqrt{72}$ is not finished — pull out the perfect square to get $6\sqrt{2}$.</li>
+</ul>
+</div>
+
+<div class="callout"><span class="co-label">Where this goes next</span>These rules are the engine for <strong>power functions (4.2)</strong> like $f(x)=x^{3/2}$, for <strong>exponential functions (5.1)</strong> where the variable sits in the exponent, and for finding <strong>domains of radical expressions (1.2)</strong>, where you must know that an even root needs a non-negative inside.</div>`,
+          ws:[
+            {part: R`A — Product, quotient, and power rules`, items: items(R`Simplify: $x^5 \cdot x^3$ @@ Simplify: $\dfrac{y^9}{y^4}$ @@ Simplify: $(a^4)^3$ @@ Simplify: $(2x^3)^4$ @@ Simplify: $\dfrac{12 x^7 y^2}{4 x^2 y^2}$ @@ Simplify: $\left(\dfrac{a^2}{b^5}\right)^3$`)},
+            {part: R`B — Zero and negative exponents`, items: items(R`Evaluate: $7^0$ @@ Evaluate: $5^{-2}$ (write as a fraction) @@ Rewrite with a positive exponent: $x^{-6}$ @@ Rewrite with a positive exponent: $\dfrac{1}{x^{-3}}$ @@ Simplify and write with positive exponents: $\dfrac{x^2}{x^{7}}$ @@ Simplify and write with positive exponents: $(3x^{-2})^{-1}$`)},
+            {part: R`C — Radical ⇄ exponent form`, items: items(R`Write in exponent form: $\sqrt[5]{x}$ @@ Write in exponent form: $\sqrt[3]{x^{2}}$ @@ Write in radical form: $x^{1/4}$ @@ Write in radical form: $x^{3/2}$ @@ Write as a single power of $x$: $\dfrac{1}{\sqrt{x}}$`)},
+            {part: R`D — Evaluate fractional-exponent expressions`, items: items(R`Evaluate: $9^{1/2}$ @@ Evaluate: $27^{1/3}$ @@ Evaluate: $16^{3/4}$ @@ Evaluate: $8^{-2/3}$ @@ Evaluate: $\left(\dfrac{1}{25}\right)^{1/2}$`)},
+            {part: R`E — Simplify radicals`, items: items(R`Simplify: $\sqrt{50}$ @@ Simplify: $\sqrt{72}$ @@ Simplify: $\sqrt[3]{54}$ @@ Simplify: $\sqrt{x^{8}}$ @@ Simplify: $\sqrt{20 x^{6}}$ @@ Simplify: $3\sqrt{8} + \sqrt{2}$`)},
+            {part: R`F — Find the error / concept check`, items: items(R`A student writes $x^4 \cdot x^3 = x^{12}$. Explain the mistake and give the correct answer. @@ A student writes $(x^2)^5 = x^{7}$. Explain the mistake and give the correct answer. @@ A student writes $2^{-3} = -8$. Explain the mistake and give the correct answer. @@ A student writes $\sqrt{9 + 16} = 3 + 4 = 7$. Explain the mistake and give the correct value. @@ True or false, with a reason: $\sqrt{72}$ is fully simplified.`)}
+          ],
+          key:[
+            {part: R`A — Product, quotient, and power rules`, sols: items(R`Same base, add exponents: $x^{5+3} = $ <strong>$x^8$</strong>. @@ Same base, subtract exponents: $y^{9-4} = $ <strong>$y^5$</strong>. @@ Power of a power, multiply: $a^{4\cdot 3} = $ <strong>$a^{12}$</strong>. @@ Apply the exponent to each factor: $2^4 (x^3)^4 = 16 x^{12} = $ <strong>$16x^{12}$</strong>. @@ Numbers: $12/4 = 3$. Then $x^{7-2} = x^5$ and $y^{2-2} = y^0 = 1$. Result: <strong>$3x^5$</strong>. @@ Apply the power to top and bottom: $\dfrac{(a^2)^3}{(b^5)^3} = $ <strong>$\dfrac{a^6}{b^{15}}$</strong>.`)},
+            {part: R`B — Zero and negative exponents`, sols: items(R`Any nonzero base to the zero power is $1$: <strong>$1$</strong>. @@ $5^{-2} = \dfrac{1}{5^2} = $ <strong>$\dfrac{1}{25}$</strong>. @@ A negative exponent means reciprocal: <strong>$\dfrac{1}{x^6}$</strong>. @@ Dividing by a negative power flips it up: $\dfrac{1}{x^{-3}} = $ <strong>$x^3$</strong>. @@ Subtract exponents: $x^{2-7} = x^{-5} = $ <strong>$\dfrac{1}{x^5}$</strong>. @@ $(3x^{-2})^{-1} = 3^{-1} x^{(-2)(-1)} = \dfrac{1}{3}x^{2} = $ <strong>$\dfrac{x^2}{3}$</strong>.`)},
+            {part: R`C — Radical ⇄ exponent form`, sols: items(R`Index $5$ becomes denominator: <strong>$x^{1/5}$</strong>. @@ Power $2$ on top, root $3$ on bottom: <strong>$x^{2/3}$</strong>. @@ Denominator $4$ is the index: <strong>$\sqrt[4]{x}$</strong>. @@ Top is the power, bottom is the root: <strong>$\sqrt{x^{3}}$</strong> (also written $\left(\sqrt{x}\right)^3$). @@ $\dfrac{1}{\sqrt{x}} = \dfrac{1}{x^{1/2}} = $ <strong>$x^{-1/2}$</strong>.`)},
+            {part: R`D — Evaluate fractional-exponent expressions`, sols: items(R`$9^{1/2} = \sqrt{9} = $ <strong>$3$</strong>. @@ $27^{1/3} = \sqrt[3]{27} = $ <strong>$3$</strong>. @@ Root first: $16^{1/4} = 2$, then $2^3 = $ <strong>$8$</strong>. @@ $8^{-2/3} = \dfrac{1}{8^{2/3}} = \dfrac{1}{(\sqrt[3]{8})^2} = \dfrac{1}{2^2} = $ <strong>$\dfrac{1}{4}$</strong>. @@ $\left(\dfrac{1}{25}\right)^{1/2} = \dfrac{\sqrt{1}}{\sqrt{25}} = $ <strong>$\dfrac{1}{5}$</strong>.`)},
+            {part: R`E — Simplify radicals`, sols: items(R`$50 = 25\cdot 2$, so $\sqrt{50} = \sqrt{25}\sqrt{2} = $ <strong>$5\sqrt{2}$</strong>. @@ $72 = 36\cdot 2$, so $\sqrt{72} = 6\sqrt{2}$. Answer: <strong>$6\sqrt{2}$</strong>. @@ $54 = 27\cdot 2$ and $27$ is a perfect cube: $\sqrt[3]{54} = \sqrt[3]{27}\,\sqrt[3]{2} = $ <strong>$3\sqrt[3]{2}$</strong>. @@ Divide the exponent by the index: $8/2 = 4$, so <strong>$x^4$</strong>. @@ $\sqrt{20}\,\sqrt{x^6} = (\sqrt{4}\sqrt{5})(x^3) = 2x^3\sqrt{5}$. Answer: <strong>$2x^3\sqrt{5}$</strong>. @@ $3\sqrt{8} = 3\cdot 2\sqrt{2} = 6\sqrt{2}$. Then $6\sqrt{2} + \sqrt{2} = $ <strong>$7\sqrt{2}$</strong>.`)},
+            {part: R`F — Find the error / concept check`, sols: items(R`The student multiplied the exponents, but multiplying like bases means you <em>add</em> them: $x^{4+3}$. Correct answer: <strong>$x^7$</strong>. @@ This is a power of a power, so you <em>multiply</em> the exponents (the student added): $x^{2\cdot 5}$. Correct answer: <strong>$x^{10}$</strong>. @@ A negative exponent means reciprocal, not a negative number: $2^{-3} = \dfrac{1}{2^3} = \dfrac{1}{8}$. Correct answer: <strong>$\dfrac{1}{8}$</strong>. @@ You cannot split a root over addition: $\sqrt{a+b} \ne \sqrt a + \sqrt b$. You must add inside first: $\sqrt{9+16} = \sqrt{25} = $ <strong>$5$</strong>. @@ False. $72 = 36\cdot 2$ contains the perfect square $36$, so it simplifies to <strong>$6\sqrt{2}$</strong>; it is not yet fully simplified.`)}
+          ]
+        },
+        {
+          id:'0.3', name:'Factoring & Simplifying Expressions',
+          blurb: R`Expand and combine like terms, then reverse the process: pull out a GCF, factor $x^2+bx+c$ and $ax^2+bx+c$, recognize a difference of squares, and use factoring to simplify rational expressions.`,
+          videos:[
+            {rank:1, t:'Factoring Trinomials & Polynomials, Basic Introduction - Algebra', ch:'The Organic Chemistry Tutor', id:'9MUDAr1PnlE', note:'Best first watch — factoring trinomials and polynomials from the basics.'},
+            {rank:2, t:'Practice these skills — interactive drills', ch:'Khan Academy', url:'https://www.khanacademy.org/math/algebra-basics', note:'Drill with instant feedback until the steps feel automatic.'}
+          ],
+          cs: R`<![CDATA[<h4>Two directions: expanding vs. factoring</h4>
+<p><strong>Expanding</strong> turns a product into a sum: $2(x+3)=2x+6$. <strong>Factoring</strong> goes backward, turning a sum into a product: $2x+6=2(x+3)$. Factoring is the engine behind finding zeros, simplifying fractions, and completing the square, so it is worth getting fluent.</p>
+
+<h4>Distributing (expanding)</h4>
+<p>Multiply the outside term by <em>every</em> term inside the parentheses. With two binomials, use <strong>FOIL</strong> (First, Outer, Inner, Last) — it is just distribution done twice.</p>
+<div class="callout formula"><span class="co-label">Formula</span>$(a+b)(c+d)=ac+ad+bc+bd$. Squaring a binomial: $(a+b)^2=a^2+2ab+b^2$ and $(a-b)^2=a^2-2ab+b^2$. The middle term $2ab$ is the one people forget.</div>
+<p>Example: $(x+4)^2=x^2+2(x)(4)+4^2=x^2+8x+16$. It is <em>not</em> $x^2+16$.</p>
+
+<h4>Combining like terms</h4>
+<p>Like terms have the <em>same variable to the same power</em>. Add their coefficients; leave the variable part unchanged. $5x+3x=8x$, and $x^2$ and $x$ are <strong>not</strong> like terms, so $x^2+x$ does not combine.</p>
+
+<h4>Factoring out a GCF (always do this first)</h4>
+<p>The <strong>greatest common factor</strong> is the largest number and lowest power of each variable shared by every term. Pull it out front; what remains goes in parentheses. Check by re-distributing.</p>
+<p>Example: $6x^3+9x^2=3x^2(2x+3)$, since $3x^2$ divides both terms.</p>
+
+<h4>Factoring $x^2+bx+c$</h4>
+<p>Find two numbers that <strong>multiply to $c$</strong> and <strong>add to $b$</strong>. Then $x^2+bx+c=(x+m)(x+n)$ where $m\cdot n=c$ and $m+n=b$.</p>
+<p>Example: $x^2+7x+12$. Need product $12$, sum $7$: that is $3$ and $4$. So $x^2+7x+12=(x+3)(x+4)$.</p>
+<div class="callout"><span class="co-label">Sign tips</span>If $c>0$ the two numbers share the sign of $b$. If $c<0$ they have opposite signs (the bigger one matches the sign of $b$).</div>
+
+<h4>Factoring $ax^2+bx+c$ (the AC method)</h4>
+<ul><li>Multiply $a\cdot c$.</li><li>Find two numbers that multiply to $a\cdot c$ and add to $b$.</li><li>Split the middle term using those numbers, then factor by grouping.</li></ul>
+<p>Example: $2x^2+7x+3$. Here $a\cdot c=6$, and $6$ and $1$ multiply to $6$, add to $7$. Split: $2x^2+6x+1x+3=2x(x+3)+1(x+3)=(x+3)(2x+1)$.</p>
+
+<h4>Difference of squares</h4>
+<div class="callout formula"><span class="co-label">Formula</span>$a^2-b^2=(a+b)(a-b)$. Example: $x^2-25=(x+5)(x-5)$. A <em>sum</em> of squares $a^2+b^2$ does NOT factor over the reals.</div>
+
+<h4>Simplifying rational expressions</h4>
+<p>Factor the top and bottom completely, then cancel any factor that appears in both. You may only cancel <strong>factors</strong> (things multiplied), never individual terms.</p>
+<p>Example: $\dfrac{x^2-9}{x^2+x-6}=\dfrac{(x+3)(x-3)}{(x+3)(x-2)}=\dfrac{x-3}{x-2}$.</p>
+
+<table class="ref"><thead><tr><th>Pattern</th><th>Factored form</th></tr></thead><tbody>
+<tr><td>$ka+kb$</td><td>$k(a+b)$ (GCF)</td></tr>
+<tr><td>$x^2+bx+c$</td><td>$(x+m)(x+n)$, $mn=c$, $m+n=b$</td></tr>
+<tr><td>$a^2-b^2$</td><td>$(a+b)(a-b)$</td></tr>
+<tr><td>$a^2+2ab+b^2$</td><td>$(a+b)^2$</td></tr>
+</tbody></table>
+
+<div class="callout warn"><span class="co-label">Common errors</span><ul><li>$(x+4)^2\ne x^2+16$. You must include the middle term: $x^2+8x+16$.</li><li>Forgetting to factor out the GCF first, which makes the rest harder or impossible.</li><li>Cancelling terms instead of factors: $\dfrac{x+3}{x}\ne 3$. You can only cancel a full factor that multiplies the whole top and bottom.</li><li>$x^2+9$ does not factor (sum of squares). Only a <em>difference</em> of squares factors.</li><li>Sign slips: $x^2-5x+6=(x-2)(x-3)$, not $(x+2)(x+3)$.</li></ul></div>
+
+<div class="callout"><span class="co-label">Used later</span>Factoring is how you find zeros of polynomials (1.2) and identify domain restrictions of rational functions (4.3, 4.4); recognizing perfect-square patterns sets up completing the square (4.1).</div>]]>`,
+          ws:[
+            {part: R`A — Distribute and expand`, items: items(R`Expand: $3(2x-5)$ @@ Expand: $-2(4x+7)$ @@ Expand using FOIL: $(x+5)(x+2)$ @@ Expand using FOIL: $(2x-3)(x+4)$ @@ Square the binomial: $(x+6)^2$ @@ Square the binomial: $(3x-2)^2$`)},
+            {part: R`B — Combine like terms`, items: items(R`Simplify: $7x+4x-2x$ @@ Simplify: $5x^2+3x-x^2+8x$ @@ Simplify: $4a+9-a+2-6$ @@ Expand and simplify: $2(x+3)+4(x-1)$ @@ Find the error: a student wrote $x^2+x=x^3$. Explain what went wrong and give the correct simplification.`)},
+            {part: R`C — Factor out the GCF`, items: items(R`Factor: $6x+15$ @@ Factor: $8x^2-12x$ @@ Factor: $10x^3+25x^2$ @@ Factor: $9a^2b-6ab^2$ @@ Find the error: a student factored $4x^2+8x$ as $4(x^2+8x)$. What is wrong, and what is the correct factoring?`)},
+            {part: R`D — Factor $x^2+bx+c$`, items: items(R`Factor: $x^2+7x+10$ @@ Factor: $x^2+9x+20$ @@ Factor: $x^2-5x+6$ @@ Factor: $x^2+2x-15$ @@ Factor: $x^2-x-12$ @@ Find the error: a student factored $x^2-5x+6$ as $(x+2)(x+3)$. Check by expanding and give the correct answer.`)},
+            {part: R`E — Factor $ax^2+bx+c$ and difference of squares`, items: items(R`Factor: $x^2-49$ @@ Factor: $9x^2-16$ @@ Factor: $2x^2+7x+3$ @@ Factor: $3x^2+10x+8$ @@ Factor completely (GCF first): $2x^2-18$ @@ Can $x^2+25$ be factored over the real numbers? Explain.`)},
+            {part: R`F — Simplify rational expressions`, items: items(R`Simplify: $\dfrac{6x+12}{3}$ @@ Simplify: $\dfrac{x^2-16}{x+4}$ @@ Simplify: $\dfrac{x^2+5x+6}{x^2-9}$ @@ Simplify: $\dfrac{2x^2+8x}{x^2+x-12}$ @@ Find the error: a student simplified $\dfrac{x+4}{x}$ to $4$ by cancelling the $x$. Why is this wrong?`)}
+          ],
+          key:[
+            {part: R`A — Distribute and expand`, sols: items(R`Multiply each inside term by $3$: $3\cdot 2x - 3\cdot 5$. <strong>$6x-15$</strong> @@ Distribute the $-2$ to both terms: <strong>$-8x-14$</strong> @@ First $x\cdot x=x^2$, Outer $x\cdot 2=2x$, Inner $5\cdot x=5x$, Last $5\cdot 2=10$; combine the middle: <strong>$x^2+7x+10$</strong> @@ $2x\cdot x=2x^2$, $2x\cdot 4=8x$, $-3\cdot x=-3x$, $-3\cdot 4=-12$; combine: <strong>$2x^2+5x-12$</strong> @@ $(x+6)^2=x^2+2(x)(6)+36$. <strong>$x^2+12x+36$</strong> (do not forget the middle term) @@ $(3x-2)^2=(3x)^2-2(3x)(2)+2^2=9x^2-12x+4$. <strong>$9x^2-12x+4$</strong>`)},
+            {part: R`B — Combine like terms`, sols: items(R`All are like terms: $7+4-2=9$. <strong>$9x$</strong> @@ $x^2$ terms: $5-1=4$, giving $4x^2$; $x$ terms: $3+8=11$, giving $11x$. <strong>$4x^2+11x$</strong> @@ Variables: $4a-a=3a$; constants: $9+2-6=5$. <strong>$3a+5$</strong> @@ Distribute: $2x+6+4x-4$; combine: $6x+2$. <strong>$6x+2$</strong> @@ $x^2$ and $x$ are <strong>not like terms</strong> (different powers), so they cannot be combined into a single term, and you never add exponents when adding. The expression $x^2+x$ is already simplified. <strong>$x^2+x$</strong>`)},
+            {part: R`C — Factor out the GCF`, sols: items(R`GCF of $6$ and $15$ is $3$: $6x+15=3(2x+5)$. <strong>$3(2x+5)$</strong> @@ GCF is $4x$: $8x^2-12x=4x(2x-3)$. <strong>$4x(2x-3)$</strong> @@ GCF is $5x^2$: $10x^3+25x^2=5x^2(2x+5)$. <strong>$5x^2(2x+5)$</strong> @@ GCF is $3ab$: $9a^2b-6ab^2=3ab(3a-2b)$. <strong>$3ab(3a-2b)$</strong> @@ The student only pulled the $4$ out of the first term, not the $x$. Both terms share $4x$. Correct: <strong>$4x(x+2)$</strong> (check: $4x\cdot x=4x^2$, $4x\cdot 2=8x$)`)},
+            {part: R`D — Factor $x^2+bx+c$`, sols: items(R`Product $10$, sum $7$: $2$ and $5$. <strong>$(x+2)(x+5)$</strong> @@ Product $20$, sum $9$: $4$ and $5$. <strong>$(x+4)(x+5)$</strong> @@ Product $6$, sum $-5$: $-2$ and $-3$. <strong>$(x-2)(x-3)$</strong> @@ Product $-15$, sum $2$: $5$ and $-3$. <strong>$(x+5)(x-3)$</strong> @@ Product $-12$, sum $-1$: $3$ and $-4$. <strong>$(x+3)(x-4)$</strong> @@ Expanding $(x+2)(x+3)=x^2+5x+6$ — the middle term has the wrong sign. We need product $6$, sum $-5$, which is $-2$ and $-3$. Correct: <strong>$(x-2)(x-3)$</strong>`)},
+            {part: R`E — Factor $ax^2+bx+c$ and difference of squares`, sols: items(R`Difference of squares with $a=x$, $b=7$: <strong>$(x+7)(x-7)$</strong> @@ $9x^2=(3x)^2$ and $16=4^2$: <strong>$(3x+4)(3x-4)$</strong> @@ AC method: $a\cdot c=6$, need two numbers multiplying to $6$, adding to $7$: $6$ and $1$. Split: $2x^2+6x+x+3=2x(x+3)+1(x+3)$. <strong>$(x+3)(2x+1)$</strong> @@ $a\cdot c=24$, need product $24$, sum $10$: $6$ and $4$. Split: $3x^2+6x+4x+8=3x(x+2)+4(x+2)$. <strong>$(x+2)(3x+4)$</strong> @@ GCF first: $2x^2-18=2(x^2-9)$; then difference of squares: $2(x+3)(x-3)$. <strong>$2(x+3)(x-3)$</strong> @@ No. $x^2+25$ is a <strong>sum</strong> of squares, not a difference, and a sum of squares does not factor over the real numbers. <strong>It does not factor (it is prime over the reals).</strong>`)},
+            {part: R`F — Simplify rational expressions`, sols: items(R`Factor the top: $\dfrac{6x+12}{3}=\dfrac{6(x+2)}{3}=2(x+2)$, or distribute: $2x+4$. <strong>$2x+4$</strong> @@ Top is a difference of squares: $\dfrac{(x+4)(x-4)}{x+4}$; cancel $(x+4)$. <strong>$x-4$</strong> (for $x\ne -4$) @@ $\dfrac{(x+2)(x+3)}{(x+3)(x-3)}$; cancel $(x+3)$. <strong>$\dfrac{x+2}{x-3}$</strong> @@ Factor: $\dfrac{2x(x+4)}{(x+4)(x-3)}$; cancel $(x+4)$. <strong>$\dfrac{2x}{x-3}$</strong> @@ You may only cancel <strong>factors</strong> (things multiplied across the whole top and bottom), and here $x$ is added to $4$, not multiplied by the whole numerator. So the $x$ does not cancel and $\dfrac{x+4}{x}$ is already simplified. <strong>The simplification is invalid; $\dfrac{x+4}{x}$ cannot be reduced.</strong>`)}
+          ]
+        },
+        {
+          id:'0.4', name:'Solving Equations',
+          blurb: R`Isolate the unknown: solve linear equations (even with fractions), rearrange literal equations for any variable, and crack quadratics by factoring, square roots, and the quadratic formula — always checking your answer.`,
+          videos:[
+            {rank:1, t:'Solving Quadratic Equations Using The Quadratic Formula & By Factoring - Algebra 2', ch:'The Organic Chemistry Tutor', id:'qwpxeaz2GBI', note:'Best first watch — the quadratic formula and solving, step by step.'},
+            {rank:2, t:'Practice these skills — interactive drills', ch:'Khan Academy', url:'https://www.khanacademy.org/math/algebra-basics', note:'Drill with instant feedback until the steps feel automatic.'}
+          ],
+          cs: R`<h4>What "solving" means</h4>
+<p>To <strong>solve</strong> an equation is to find every value of the variable that makes the two sides equal. The golden rule: <em>whatever you do to one side, do to the other</em>. Legal moves are add, subtract, multiply, or divide both sides by the same thing (never divide by zero).</p>
+<div class="callout"><span class="co-label">Always check</span>Substitute your answer back into the <em>original</em> equation. If both sides come out equal, you are done. This one habit catches almost every arithmetic slip.</div>
+
+<h4>Linear equations</h4>
+<p>A linear equation has the variable to the first power only. Strategy: clear fractions, expand brackets, collect the variable on one side and numbers on the other, then divide.</p>
+<ul>
+<li><strong>Clear fractions first.</strong> Multiply <em>every term</em> by the least common denominator (LCD). This turns a messy fraction equation into a clean one.</li>
+<li>Watch the sign when you move a term across the equals sign — moving it flips its sign.</li>
+</ul>
+<div class="callout formula"><span class="co-label">Formula</span>Three outcomes: a normal equation gives <strong>one solution</strong> (e.g. $x=5$); an always-true result like $7=7$ means <strong>all real numbers</strong>; a false result like $3=8$ means <strong>no solution</strong>.</div>
+
+<h4>Literal equations (solve for a letter)</h4>
+<p>Same rules, but the answer is an expression instead of a number. Treat the variable you want as "the unknown" and treat every other letter as if it were just a number. Isolate it the same way you would isolate $x$.</p>
+<p>Example: solve $A=\tfrac12 bh$ for $h$. Multiply both sides by 2: $2A=bh$. Divide by $b$: $h=\dfrac{2A}{b}$.</p>
+
+<h4>Quadratic equations — three methods</h4>
+<p>A quadratic has the form $ax^2+bx+c=0$ (with $a\neq 0$). First get one side equal to zero. Then pick the easiest method.</p>
+<table class="ref"><thead><tr><th>Method</th><th>Use it when</th></tr></thead><tbody>
+<tr><td>Factoring + Zero-Product</td><td>The quadratic factors nicely</td></tr>
+<tr><td>Square-root method</td><td>There is no middle ($bx$) term: $x^2=k$ or $(x-h)^2=k$</td></tr>
+<tr><td>Quadratic formula</td><td>Always works — your safety net</td></tr>
+</tbody></table>
+<div class="callout formula"><span class="co-label">Formula</span><strong>Zero-Product Property:</strong> if $A\cdot B=0$ then $A=0$ or $B=0$.<br><strong>Square root:</strong> if $x^2=k$ then $x=\pm\sqrt{k}$ (do not forget the $\pm$).<br><strong>Quadratic formula:</strong> for $ax^2+bx+c=0$, $\;x=\dfrac{-b\pm\sqrt{b^2-4ac}}{2a}$.</div>
+<p>The piece under the root, $b^2-4ac$, is the <strong>discriminant</strong>. Positive gives two real solutions, zero gives one (repeated), negative gives no real solutions.</p>
+<p><strong>Completing the square (brief idea):</strong> rewrite $x^2+bx$ as a perfect square by adding $\left(\tfrac{b}{2}\right)^2$ to both sides, then use the square-root method. For $x^2+6x=7$: add $\left(\tfrac{6}{2}\right)^2=9$ to both sides to get $(x+3)^2=16$, so $x+3=\pm4$, giving $x=1$ or $x=-7$. This is also where the quadratic formula comes from.</p>
+
+<h4>Fully worked example (quadratic formula)</h4>
+<p>Solve $2x^2+x-6=0$.</p>
+<ul>
+<li>Identify $a=2,\;b=1,\;c=-6$.</li>
+<li>Discriminant: $b^2-4ac=(1)^2-4(2)(-6)=1+48=49$.</li>
+<li>$x=\dfrac{-1\pm\sqrt{49}}{2(2)}=\dfrac{-1\pm7}{4}$.</li>
+<li>Two answers: $x=\dfrac{-1+7}{4}=\dfrac{6}{4}=\dfrac{3}{2}$ and $x=\dfrac{-1-7}{4}=\dfrac{-8}{4}=-2$.</li>
+<li><strong>Check $x=-2$:</strong> $2(-2)^2+(-2)-6=8-2-6=0$. True. <strong>Solutions: $x=\tfrac32$ or $x=-2$.</strong></li>
+</ul>
+
+<div class="callout warn"><span class="co-label">Common errors</span>
+<ul>
+<li>Forgetting the $\pm$ in the square-root method — you lose half your answers.</li>
+<li>Dividing by a variable. Never divide $x^2=4x$ by $x$ (you would lose the solution $x=0$). Instead move everything to one side: $x^2-4x=0$, factor to $x(x-4)=0$.</li>
+<li>When clearing fractions, multiplying only <em>some</em> terms by the LCD. Every term gets multiplied.</li>
+<li>Sign slips in $-b$ and in $-4ac$ when $c$ is negative: $-4(2)(-6)=+48$, not $-48$.</li>
+<li>Trying to factor or square-root a quadratic that still has a nonzero side. Get it to $=0$ (for factoring) or isolate the squared term (for square roots) first.</li>
+</ul>
+</div>
+
+<div class="callout"><span class="co-label">Where this leads</span>Solving equations is the engine for the rest of the course: solving $f(x)=k$ is just an equation in $x$; finding the <em>zeros</em> (x-intercepts) of a function means solving $f(x)=0$; and finding an <em>inverse</em> means solving $y=f(x)$ for $x$. Master this and those later topics become routine.</div>`,
+          ws:[
+            {part: R`A — Linear equations (basic)`, items: items(R`Solve: $3x + 7 = 22$ @@ Solve: $5x - 4 = 2x + 11$ @@ Solve: $4(x - 3) = 2x + 6$ @@ Solve: $7 - 2x = 3x - 8$ @@ Solve: $2(3x + 1) - 5 = 4(x - 2) + 9$ @@ Solve: $6x + 5 = 6x - 1$ (what happens?)`)},
+            {part: R`B — Linear equations with fractions`, items: items(R`Solve: $\dfrac{x}{3} + 2 = 5$ @@ Solve: $\dfrac{x}{2} + \dfrac{x}{4} = 9$ @@ Solve: $\dfrac{2x - 1}{5} = 3$ @@ Solve: $\dfrac{x}{3} - \dfrac{1}{2} = \dfrac{x}{6} + 1$ @@ Solve: $\dfrac{3}{4}x + \dfrac{1}{2} = \dfrac{1}{4}x - \dfrac{3}{2}$`)},
+            {part: R`C — Literal equations (solve for the boxed letter)`, items: items(R`Solve for $x$: $y = mx + b$ @@ Solve for $r$: $C = 2\pi r$ @@ Solve for $h$: $V = \pi r^2 h$ @@ Solve for $F$: $C = \dfrac{5}{9}(F - 32)$ @@ Solve for $b$: $A = \dfrac{1}{2}(a + b)h$`)},
+            {part: R`D — Quadratics by factoring and by square roots`, items: items(R`Solve by factoring: $x^2 - 7x + 12 = 0$ @@ Solve by factoring: $x^2 - 5x = 0$ @@ Solve by factoring: $x^2 - 9 = 0$ @@ Solve by the square-root method: $x^2 = 49$ @@ Solve by the square-root method: $(x - 2)^2 = 16$ @@ Solve by the square-root method: $3x^2 - 27 = 0$`)},
+            {part: R`E — Quadratics by the quadratic formula (and completing the square)`, items: items(R`Solve with the quadratic formula: $x^2 + 5x + 6 = 0$ @@ Solve with the quadratic formula: $2x^2 - 3x - 2 = 0$ @@ Solve with the quadratic formula: $x^2 - 4x + 1 = 0$ (leave answer with a square root) @@ Use the discriminant $b^2 - 4ac$ to say how many real solutions $x^2 + 2x + 5 = 0$ has (do not fully solve) @@ Complete the square to solve: $x^2 + 6x - 7 = 0$`)},
+            {part: R`F — Find the error`, items: items(R`A student solves $x^2 = 25$ and writes 'so $x = 5$.' What did they miss, and what is the correct answer? @@ A student solves $x^2 = 4x$ by dividing both sides by $x$ to get $x = 4$. Why is this wrong, and what are all the solutions? @@ A student clears fractions in $\dfrac{x}{2} + 3 = \dfrac{x}{4}$ by multiplying only the fraction terms by 4, writing $2x + 3 = x$. Find and fix the error. @@ A student uses the quadratic formula on $x^2 - x - 6 = 0$ and computes the discriminant as $(-1)^2 - 4(1)(-6) = 1 - 24 = -23$. Find the mistake and give the correct solutions.`)}
+          ],
+          key:[
+            {part: R`A — Linear equations (basic)`, sols: items(R`$3x = 15$, so <strong>$x = 5$</strong>. Check: $3(5)+7=22$. True. @@ Subtract $2x$: $3x - 4 = 11$. Add 4: $3x = 15$. <strong>$x = 5$</strong>. Check: $5(5)-4=21$ and $2(5)+11=21$. True. @@ Expand: $4x - 12 = 2x + 6$. Subtract $2x$: $2x - 12 = 6$. Add 12: $2x = 18$. <strong>$x = 9$</strong>. Check: $4(9-3)=24$ and $2(9)+6=24$. True. @@ Add $2x$: $7 = 5x - 8$. Add 8: $15 = 5x$. <strong>$x = 3$</strong>. Check: $7-2(3)=1$ and $3(3)-8=1$. True. @@ Expand: $6x + 2 - 5 = 4x - 8 + 9$, i.e. $6x - 3 = 4x + 1$. Subtract $4x$: $2x - 3 = 1$. Add 3: $2x = 4$. <strong>$x = 2$</strong>. Check: left $6(2)-3=9$; right $4(2)+1=9$. True. @@ Subtract $6x$ from both sides: $5 = -1$, which is false. <strong>No solution.</strong> The variable cancels and leaves a false statement.`)},
+            {part: R`B — Linear equations with fractions`, sols: items(R`Subtract 2: $\dfrac{x}{3} = 3$. Multiply by 3: <strong>$x = 9$</strong>. Check: $\dfrac{9}{3}+2=5$. True. @@ LCD is 4. Multiply every term by 4: $2x + x = 36$, so $3x = 36$. <strong>$x = 12$</strong>. Check: $\dfrac{12}{2}+\dfrac{12}{4}=6+3=9$. True. @@ Multiply both sides by 5: $2x - 1 = 15$. Add 1: $2x = 16$. <strong>$x = 8$</strong>. Check: $\dfrac{2(8)-1}{5}=\dfrac{15}{5}=3$. True. @@ LCD is 6. Multiply every term by 6: $2x - 3 = x + 6$. Subtract $x$: $x - 3 = 6$. <strong>$x = 9$</strong>. Check: $\dfrac{9}{3}-\dfrac12=3-0.5=2.5$ and $\dfrac{9}{6}+1=1.5+1=2.5$. True. @@ LCD is 4. Multiply every term by 4: $3x + 2 = x - 6$. Subtract $x$: $2x + 2 = -6$. Subtract 2: $2x = -8$. <strong>$x = -4$</strong>. Check: left $\dfrac34(-4)+\dfrac12=-3+0.5=-2.5$; right $\dfrac14(-4)-\dfrac32=-1-1.5=-2.5$. True.`)},
+            {part: R`C — Literal equations (solve for the boxed letter)`, sols: items(R`Subtract $b$: $y - b = mx$. Divide by $m$: <strong>$x = \dfrac{y - b}{m}$</strong>. @@ Divide both sides by $2\pi$: <strong>$r = \dfrac{C}{2\pi}$</strong>. @@ Divide both sides by $\pi r^2$: <strong>$h = \dfrac{V}{\pi r^2}$</strong>. @@ Multiply both sides by $\dfrac{9}{5}$: $\dfrac{9}{5}C = F - 32$. Add 32: <strong>$F = \dfrac{9}{5}C + 32$</strong>. @@ Multiply both sides by 2: $2A = (a + b)h$. Divide by $h$: $\dfrac{2A}{h} = a + b$. Subtract $a$: <strong>$b = \dfrac{2A}{h} - a$</strong>.`)},
+            {part: R`D — Quadratics by factoring and by square roots`, sols: items(R`Factor: $(x - 3)(x - 4) = 0$. Zero-product: $x = 3$ or $x = 4$. <strong>$x = 3,\ 4$</strong>. Check $x=3$: $9-21+12=0$. True. @@ Factor out $x$: $x(x - 5) = 0$. So $x = 0$ or $x = 5$. <strong>$x = 0,\ 5$</strong>. (Do not divide by $x$ — you would lose $x=0$.) @@ Difference of squares: $(x - 3)(x + 3) = 0$. <strong>$x = 3,\ -3$</strong>. Check $x=-3$: $9-9=0$. True. @@ Take the square root of both sides: $x = \pm\sqrt{49}$. <strong>$x = 7,\ -7$</strong>. @@ Square root both sides: $x - 2 = \pm 4$. So $x = 2 + 4 = 6$ or $x = 2 - 4 = -2$. <strong>$x = 6,\ -2$</strong>. Check $x=6$: $(6-2)^2=16$. True. @@ Add 27: $3x^2 = 27$. Divide by 3: $x^2 = 9$. Square root: $x = \pm 3$. <strong>$x = 3,\ -3$</strong>.`)},
+            {part: R`E — Quadratics by the quadratic formula (and completing the square)`, sols: items(R`$a=1,\ b=5,\ c=6$. Discriminant $=25 - 24 = 1$. $x = \dfrac{-5 \pm 1}{2}$, giving $x = -2$ or $x = -3$. <strong>$x = -2,\ -3$</strong>. Check $x=-2$: $4-10+6=0$. True. @@ $a=2,\ b=-3,\ c=-2$. Discriminant $=(-3)^2 - 4(2)(-2)=9+16=25$. $x = \dfrac{3 \pm 5}{4}$, giving $x = 2$ or $x = -\dfrac12$. <strong>$x = 2,\ -\dfrac12$</strong>. @@ $a=1,\ b=-4,\ c=1$. Discriminant $=16 - 4 = 12$. $x = \dfrac{4 \pm \sqrt{12}}{2} = \dfrac{4 \pm 2\sqrt{3}}{2} = 2 \pm \sqrt{3}$. <strong>$x = 2 + \sqrt{3},\ 2 - \sqrt{3}$</strong>. @@ $a=1,\ b=2,\ c=5$. Discriminant $=2^2 - 4(1)(5) = 4 - 20 = -16$, which is negative. <strong>No real solutions.</strong> @@ Move the constant: $x^2 + 6x = 7$. Add $\left(\dfrac{6}{2}\right)^2 = 9$ to both sides: $x^2 + 6x + 9 = 16$, so $(x + 3)^2 = 16$. Square root: $x + 3 = \pm 4$. So $x = 1$ or $x = -7$. <strong>$x = 1,\ -7$</strong>. Check $x=1$: $1+6-7=0$. True.`)},
+            {part: R`F — Find the error`, sols: items(R`They dropped the $\pm$. Square-rooting both sides gives $x = \pm\sqrt{25}$, so both $5$ and $-5$ work ($(-5)^2 = 25$ too). <strong>Correct answer: $x = 5,\ -5$.</strong> @@ Dividing by $x$ assumes $x \neq 0$ and throws away the solution $x = 0$. Instead move everything to one side: $x^2 - 4x = 0$, factor $x(x - 4) = 0$. <strong>Correct answers: $x = 0,\ 4$.</strong> @@ Every term must be multiplied by the LCD, including the 3. Correct: $4 \cdot \dfrac{x}{2} + 4 \cdot 3 = 4 \cdot \dfrac{x}{4}$ gives $2x + 12 = x$. Then $x = -12$. <strong>Correct answer: $x = -12$.</strong> Check: $\dfrac{-12}{2}+3=-3$ and $\dfrac{-12}{4}=-3$. True. @@ Sign error: $-4(1)(-6) = +24$, not $-24$. Correct discriminant $= 1 + 24 = 25$. Then $x = \dfrac{1 \pm 5}{2}$, giving $x = 3$ or $x = -2$. <strong>Correct answers: $x = 3,\ -2$.</strong> Check $x=3$: $9-3-6=0$. True.`)}
+          ]
+        }
+      ]
+    },
+    {
+      id:'u1', n:'01', name:'Functions',
       subtopics:[
         {
           id:'1.1', name:'Functions, Notation & Evaluation',
           blurb:'What a function is, how to read and use $f(x)$ notation, and the Rule of Four for moving between words, tables, graphs, and formulas.',
           videos:[
             {rank:1, t:'Functions (intro with multiple-choice practice)', ch:'The Organic Chemistry Tutor', id:'1xATmTI-YY8', note:'Best first watch — concise, with built-in practice.'},
-            {rank:2, t:'Function Notation', ch:'The Organic Chemistry Tutor', id:'q149iUGpeb4', note:'Drills evaluation and notation specifically.'},
+            {rank:2, t:'Function Notation', ch:'Tyler Wallace', id:'q149iUGpeb4', note:'Drills evaluation and notation specifically.'},
             {rank:3, t:'Introduction to Functions (full lecture)', ch:'Professor Leonard', id:'FkUEsP9efFg', note:'Go deeper, with the theory behind the mechanics.'},
             {rank:4, t:'Functions unit — interactive practice', ch:'Khan Academy', url:KHAN_A2, note:'Practice problems with mastery tracking.'}
           ],
@@ -539,7 +859,7 @@ $x-5\ge0\Rightarrow x\ge5$, so $\mathbf{[5,\infty)}$ — includes 5 since $\sqrt
           cs: R`<h4>Average rate of change</h4>
 <div class="callout formula"><span class="co-label">Definition</span>Over $[a,b]$, $\ \text{AROC}=\dfrac{\Delta y}{\Delta x}=\dfrac{f(b)-f(a)}{b-a}.$ It answers: on average, how many output units per input unit did $f$ change? Always carry units.</div>
 <p><strong>Geometric meaning:</strong> it is the slope of the <strong>secant line</strong> through $(a,f(a))$ and $(b,f(b))$.</p>
-<p><strong>From a table:</strong> pick the two rows and apply the formula. <strong>Linearity test:</strong> if AROC is the <em>same over every interval</em>, the function is linear and that constant is the slope; if it changes, the function is curved.</p>
+<p><strong>From a table:</strong> pick the two rows and apply the formula. <strong>Linearity test:</strong> for <em>equally spaced</em> inputs, a constant AROC (equal first differences) means the function is linear and that constant is the slope; if the AROC changes, it is curved. Two matching intervals only <em>suggest</em> linearity — one constant AROC across <em>every</em> interval is what proves it.</p>
 <h4>The difference quotient</h4>
 <div class="callout formula"><span class="co-label">Formula</span>Over $[x,x+h]$: $\ \dfrac{f(x+h)-f(x)}{h}.$ Simplify to a formula in $x$ and $h$. Calculus shrinks $h\to0$ to get the <strong>derivative</strong>.</div>
 <p><strong>Worked example.</strong> For $f(x)=x^2$: $\dfrac{(x+h)^2-x^2}{h}=\dfrac{2xh+h^2}{h}=2x+h$; as $h\to0$ this becomes $2x$.</p>
@@ -752,8 +1072,8 @@ their slopes are negative reciprocals — $m_1 m_2=-1$ @@ $x=2$ is a vertical li
           id:'2.3', name:'Fitting Linear Functions to Data',
           blurb:'Reading scatter plots, fitting a line of best fit, and using it to model and predict — plus correlation, interpolation, and why correlation is not causation.',
           videos:[
-            {rank:1, t:'Drawing a Line of Best Fit on a Scatter Plot', ch:'YouTube', id:'l2BOZDosuIk', note:'Best first watch — fit the trend line and read its slope and intercept.'},
-            {rank:2, t:'Estimating the Correlation Coefficient from a Scatter Plot', ch:'YouTube', id:'xCwUyKf95iQ', note:'Judge the direction and strength (r) of a relationship by eye.'},
+            {rank:1, t:'Drawing a Line of Best Fit on a Scatter Plot', ch:'MooMooMath and Science', id:'l2BOZDosuIk', note:'Best first watch — fit the trend line and read its slope and intercept.'},
+            {rank:2, t:'Estimating the Correlation Coefficient from a Scatter Plot', ch:'Mathispower4u', id:'xCwUyKf95iQ', note:'Judge the direction and strength (r) of a relationship by eye.'},
             {rank:3, t:'Exploring two-variable data — scatter plots, trend lines, r', ch:'Khan Academy', url:'https://www.khanacademy.org/math/statistics-probability', note:'Interactive practice fitting lines and interpreting correlation.'}
           ],
           cs: R`<h4>Scatter plots and correlation</h4>
@@ -805,16 +1125,19 @@ very strong positive linear relationship @@ weak negative relationship @@ no lin
           id:'3.1', name:'Shifts & Reflections',
           blurb:'How changing a formula moves its graph: vertical and horizontal shifts and reflections, starting from a library of parent functions.',
           videos:[
-            {rank:1, t:'Transformations of Functions (Precalculus) — find this title in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — parent functions, shifts, and reflections with many graphs.'},
+            {rank:1, t:'Transformations of Functions: Shifts & Reflections', ch:'The Organic Chemistry Tutor', id:'Tmdrjs9xufc', note:'Best first watch — parent functions plus vertical/horizontal shifts and reflections, with many graphs.'},
             {rank:2, t:'Shifting & reflecting functions — interactive practice', ch:'Khan Academy', url:'https://www.khanacademy.org/math/precalculus', note:'Drill the rules with instant feedback.'},
             {rank:3, t:'Transformations of functions (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Go deeper on why horizontal shifts run opposite to intuition.'}
           ],
           cs: R`<h4>The parent-function library</h4>
 <p>Every transformation starts from a known basic shape. Memorize these.</p>
-<table class="ref"><thead><tr><th>Parent</th><th>Shape</th><th>Parent</th><th>Shape</th></tr></thead><tbody>
-<tr><td>$f(x)=x$</td><td>line</td><td>$f(x)=\sqrt{x}$</td><td>half-sideways parabola</td></tr>
-<tr><td>$f(x)=x^2$</td><td>parabola (cup)</td><td>$f(x)=|x|$</td><td>V-shape</td></tr>
-<tr><td>$f(x)=x^3$</td><td>S-curve</td><td>$f(x)=\dfrac1x$</td><td>two hyperbola branches</td></tr>
+<table class="ref"><thead><tr><th>Parent</th><th>Shape</th><th>Anchor points</th><th>Domain</th></tr></thead><tbody>
+<tr><td>$f(x)=x$</td><td>line through the origin</td><td>$(-1,-1),(0,0),(1,1)$</td><td>$(-\infty,\infty)$</td></tr>
+<tr><td>$f(x)=x^2$</td><td>parabola opening up (cup)</td><td>$(-1,1),(0,0),(1,1)$</td><td>$(-\infty,\infty)$</td></tr>
+<tr><td>$f(x)=x^3$</td><td>increasing S-curve</td><td>$(-1,-1),(0,0),(1,1)$</td><td>$(-\infty,\infty)$</td></tr>
+<tr><td>$f(x)=\sqrt{x}$</td><td>upper half of a sideways parabola; starts at the origin, opens right</td><td>$(0,0),(1,1),(4,2)$</td><td>$[0,\infty)$</td></tr>
+<tr><td>$f(x)=|x|$</td><td>V-shape, corner at the origin</td><td>$(-1,1),(0,0),(1,1)$</td><td>$(-\infty,\infty)$</td></tr>
+<tr><td>$f(x)=\dfrac1x$</td><td>two hyperbola branches; the axes are asymptotes</td><td>$(-1,-1),(1,1),(2,\tfrac12)$</td><td>$x\neq0$</td></tr>
 </tbody></table>
 <h4>Shifts</h4>
 <table class="ref"><thead><tr><th>Change</th><th>Effect</th><th>Note</th></tr></thead><tbody>
@@ -854,14 +1177,14 @@ $f(x-3)+2$ @@ $f(x+1)-4$ @@ $-f(x)+5$ @@ $f(-(x+2))$, i.e. $f(-x-2)$`)},
             {part:'E', sols: items(R`
 $(2,8)$ @@ $(6,5)$ @@ $(2,-5)$ @@ $(-2,5)$ @@ $(1,3)$`)},
             {part:'F', sols: items(R`
-the graph reaches the parent's value when $x-3=0$, i.e. at $x=3$, so each point sits $3$ units to the right @@ <strong>false</strong> — one flips vertically, the other horizontally (they agree only for functions symmetric in the right way) @@ at $(4,0)$ — adding $2$ raised it onto the $x$-axis, creating a zero at $x=4$`)}
+the graph reaches the parent's value when $x-3=0$, i.e. at $x=3$, so each point sits $3$ units to the right @@ <strong>false</strong> — one flips vertically, the other horizontally (they agree only when $f$ is <strong>odd</strong>, i.e. $f(-x)=-f(x)$) @@ at $(4,0)$ — adding $2$ raised it onto the $x$-axis, creating a zero at $x=4$`)}
           ]
         },
         {
           id:'3.2', name:'Stretches & Combined Transformations',
           blurb:'Scaling a graph vertically and horizontally, and applying an ordered chain of transformations in the general form $a\\,f(b(x-h))+k$.',
           videos:[
-            {rank:1, t:'Transformations of Functions (Precalculus) — stretches & combined', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Same lesson as 3.1 — focus on the stretch, compression, and combined-transformation examples.'},
+            {rank:1, t:'Stretches, Compressions & Combined Transformations', ch:'Caveman Chang | Algebra Teacher', id:'iD-bzUjdyCc', note:'Walks through stretches, compressions, and the combined general form a f(b(x-h))+k.'},
             {rank:2, t:'Stretching & compressing functions — practice', ch:'Khan Academy', url:'https://www.khanacademy.org/math/precalculus', note:'Practice scaling and ordered transformations.'},
             {rank:3, t:'Combined transformations (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment of order of operations on graphs.'}
           ],
@@ -879,7 +1202,7 @@ the graph reaches the parent's value when $x-3=0$, i.e. at $x=3$, so each point 
 </tbody></table>
 <div class="callout formula"><span class="co-label">General form</span>$y=a\,f\big(b(x-h)\big)+k$. Read it as: horizontal scale by $\tfrac1b$ and shift $h$ (inside), then vertical scale by $a$ and shift $k$ (outside).</div>
 <h4>Order of a combined transformation</h4>
-<p>Work <strong>inside-out</strong>: handle horizontal scaling and shifting first, then vertical scaling/reflection, then the vertical shift. On a point $(a,b)$: $x' = \dfrac{a}{b}+h$ and $y' = a_{\text{scale}}\cdot b + k$.</p>
+<p>Work <strong>inside-out</strong>: handle horizontal scaling and shifting first, then vertical scaling/reflection, then the vertical shift. Take a point $(x_0,y_0)$ on $f$; under $y=a\,f\big(b(x-h)\big)+k$ it lands at $\left(\dfrac{x_0}{b}+h,\ \ a\,y_0+k\right)$ — divide the input by the horizontal scale $b$ and add $h$, then multiply the output by the vertical scale $a$ and add $k$.</p>
 <div class="callout warn"><span class="co-label">Common errors</span>Treating $f(2x)$ as a stretch (it compresses). Applying the vertical shift before the stretch. Forgetting that a negative coefficient both scales <em>and</em> reflects.</div>
 <div class="callout formula"><span class="co-label">Calculus connection</span>The same scale-and-shift language describes how the graph of a derivative or an integral relates to the original.</div>`,
           ws:[
@@ -920,7 +1243,7 @@ inputs are doubled, so the graph reaches each value at half the $x$, pulling it 
           id:'4.1', name:'Quadratic Functions',
           blurb:'Parabolas in their three forms, finding the vertex by completing the square, solving with the quadratic formula and discriminant, and optimization.',
           videos:[
-            {rank:1, t:'Graphing Quadratic Functions (vertex & standard form) — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — vertex, axis of symmetry, and graphing from each form.'},
+            {rank:1, t:'Graphing Quadratics in Vertex & Standard Form', ch:'The Organic Chemistry Tutor', id:'Hq2Up_1Ih5E', note:'Vertex and standard form, axis of symmetry, and graphing parabolas with worked examples.'},
             {rank:2, t:'Quadratic functions & equations — practice', ch:'Khan Academy', url:KHAN_A2, note:'Drill vertex form, factoring, and the quadratic formula.'},
             {rank:3, t:'Quadratic functions (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment of completing the square and optimization.'}
           ],
@@ -970,7 +1293,7 @@ the parabola does not cross the $x$-axis (no real roots) @@ $h=-\dfrac{-6}{2}=3$
           id:'4.2', name:'Power Functions & Variation',
           blurb:'Power functions $kx^n$ and their behavior, direct and inverse variation, finding the constant from data, and exponent fluency.',
           videos:[
-            {rank:1, t:'Direct, Inverse & Joint Variation — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — setting up and solving variation problems.'},
+            {rank:1, t:'Introduction to Direct & Inverse Variation', ch:'Professor Leonard', id:'lRv1R-bELe4', note:'A slow, thorough introduction to direct and inverse variation — ideal if you are rusty.'},
             {rank:2, t:'Direct & inverse variation — practice', ch:'Khan Academy', url:KHAN_A2, note:'Drill finding the constant and solving.'},
             {rank:3, t:'Power functions & variation (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment of power-function behavior.'}
           ],
@@ -1018,7 +1341,7 @@ $y$ is <strong>halved</strong> @@ only $y=kx$ increases with $x$; $y=k/x$ <em>de
           id:'4.3', name:'Polynomial Functions',
           blurb:'End behavior from degree and leading coefficient, zeros and their multiplicity, turning points, and building a polynomial from its roots.',
           videos:[
-            {rank:1, t:'Graphing Polynomial Functions: end behavior, zeros, multiplicity — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — reading end behavior and sketching from zeros.'},
+            {rank:1, t:'Graphing Polynomials: End Behavior, Zeros & Multiplicity', ch:'The Organic Chemistry Tutor', id:'a5x4lwnvHM0', note:'Ties end behavior, zeros, and multiplicity into a step-by-step graphing procedure.'},
             {rank:2, t:'Polynomial graphs — practice', ch:'Khan Academy', url:KHAN_A2, note:'Drill zeros, multiplicity, and end behavior.'},
             {rank:3, t:'Polynomial functions (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment of zeros and graphing.'}
           ],
@@ -1072,7 +1395,7 @@ its ends point in opposite directions, so the graph must cross the $x$-axis some
           id:'4.4', name:'Rational Functions',
           blurb:'Domains, vertical and horizontal and slant asymptotes, holes, and intercepts — everything needed to graph a ratio of polynomials.',
           videos:[
-            {rank:1, t:'Graphing Rational Functions with Vertical & Horizontal Asymptotes — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — asymptotes, holes, and graphing.'},
+            {rank:1, t:'Graphing Rational Functions: Asymptotes & Holes', ch:'The Organic Chemistry Tutor', id:'XE-Z2-F3oWw', note:'Vertical, horizontal, and slant asymptotes plus holes — everything 4.4 needs in one video.'},
             {rank:2, t:'Horizontal & Slant Asymptotes of Rational Functions — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'The degree rules for horizontal and slant asymptotes.'},
             {rank:3, t:'Rational functions — practice', ch:'Khan Academy', url:KHAN_A2, note:'Drill domains, asymptotes, and holes.'}
           ],
@@ -1122,7 +1445,7 @@ $x^2-1=(x-1)(x+1)$ cancels the $x-1$, removing the asymptote and leaving a singl
           id:'4.5', name:'Composition & Inverse Functions',
           blurb:'Composing and decomposing functions, finding and verifying inverses algebraically, and the one-to-one condition for invertibility.',
           videos:[
-            {rank:1, t:'Composite Functions / How To Find the Inverse of a Function — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — composition, then finding and verifying inverses.'},
+            {rank:1, t:'Composite & Inverse Functions', ch:'The Organic Chemistry Tutor', id:'GEgFmxxOJno', note:'Composite functions and finding and verifying inverses, together.'},
             {rank:2, t:'Composing & inverting functions — practice', ch:'Khan Academy', url:KHAN_A2, note:'Drill composition and inverses with feedback.'},
             {rank:3, t:'Composition & inverse functions (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment, including domain of a composition.'}
           ],
@@ -1172,7 +1495,7 @@ the $-1$ denotes the inverse operation (undoing $f$), not a reciprocal; $\dfrac1
           id:'5.1', name:'Exponential Functions & e',
           blurb:'Functions with a constant percent change, the base $e$ and continuous growth, and the graph features of $a\\,b^x$.',
           videos:[
-            {rank:1, t:'Exponential Functions (graphing, growth & decay) — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — growth vs decay and the graph.'},
+            {rank:1, t:'Graphing Exponential Functions (including e)', ch:'The Organic Chemistry Tutor', id:'3G5WluJ7LFA', note:'Exponential functions including base e, growth vs decay, and graphing.'},
             {rank:2, t:'Exponential functions — practice', ch:'Khan Academy', url:KHAN_A2, note:'Drill growth, decay, and evaluation.'},
             {rank:3, t:'Exponential functions (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment, including $e$.'}
           ],
@@ -1217,7 +1540,7 @@ linear <em>adds</em> a constant each step; exponential <em>multiplies</em> by a 
           id:'5.2', name:'Comparing Growth',
           blurb:'Telling linear, power, and exponential growth apart from data, and the fact that exponential growth eventually overtakes any polynomial.',
           videos:[
-            {rank:1, t:'Linear, Exponential & Quadratic models — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — distinguishing model types from data.'},
+            {rank:1, t:'Linear vs. Exponential Growth from Data', ch:'Khan Academy', id:'721RrH6auoU', note:'Rule-of-Four: tells linear (constant difference) from exponential (constant ratio) using data.'},
             {rank:2, t:'Comparing linear & exponential growth — practice', ch:'Khan Academy', url:KHAN_A2, note:'Classify data and scenarios.'},
             {rank:3, t:'Exponential vs polynomial growth (intuition)', ch:'Khan Academy', url:'https://www.khanacademy.org/math/precalculus', note:'See why exponential wins in the long run.'}
           ],
@@ -1260,7 +1583,7 @@ the one larger later is the exponential — it overtakes the slower-growing type
           id:'5.3', name:'Logarithms: Definition & Properties',
           blurb:'Logarithms as the inverse of exponentials, converting between forms, evaluating, and the product, quotient, power, and change-of-base rules.',
           videos:[
-            {rank:1, t:'Logarithms — introduction & properties — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — definition, evaluating, and the log rules.'},
+            {rank:1, t:'Logarithms: Rules, Properties & Evaluation', ch:'The Organic Chemistry Tutor', id:'LRbi_pMX1DM', note:'Defines logs, evaluates them, and walks through every log rule for beginners.'},
             {rank:2, t:'Intro to logarithms — practice', ch:'Khan Academy', url:KHAN_A2, note:'Drill conversion and properties.'},
             {rank:3, t:'Logarithms (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment of the properties.'}
           ],
@@ -1310,7 +1633,7 @@ $b^0=1$, so the exponent that gives $1$ is $0$ @@ the product rule applies to a 
           id:'5.4', name:'Log Functions, Graphs & Solving',
           blurb:'The graph of a logarithm, and solving exponential and logarithmic equations — including checking for extraneous solutions.',
           videos:[
-            {rank:1, t:'Solving Exponential & Logarithmic Equations — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — the two solving strategies and extraneous roots.'},
+            {rank:1, t:'Graphing Logarithmic Functions', ch:'The Organic Chemistry Tutor', id:'-nptxS9rZNA', note:'Graphing log functions with asymptotes and domain, as the inverse of exponentials.'},
             {rank:2, t:'Solving exponential & log equations — practice', ch:'Khan Academy', url:KHAN_A2, note:'Drill both equation types.'},
             {rank:3, t:'Logarithmic functions (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment of graphs and solving.'}
           ],
@@ -1358,7 +1681,7 @@ $\log_b x$ inverts $b^x$, whose outputs are only positive, so its inputs (the lo
           id:'5.5', name:'Exponential & Logarithmic Modeling',
           blurb:'Growth and decay models, half-life and doubling time, compound interest, and logarithmic scales — and solving for time with logs.',
           videos:[
-            {rank:1, t:'Exponential Growth & Decay / Compound Interest — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — half-life, doubling, and interest problems.'},
+            {rank:1, t:'Exponential Growth & Decay Word Problems', ch:'The Organic Chemistry Tutor', id:'e5nwJKUc3bA', note:'Worked half-life, doubling-time, and growth and decay word problems.'},
             {rank:2, t:'Exponential models — practice', ch:'Khan Academy', url:KHAN_A2, note:'Drill modeling and solving for time.'},
             {rank:3, t:'Exponential applications (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment of word problems.'}
           ],
@@ -1407,7 +1730,7 @@ the unknown is in the exponent, and a log is the inverse that brings it down @@ 
           id:'6.1', name:'Angles, Radians & the Unit Circle',
           blurb:'Measuring angles in degrees and radians, coterminal angles, the unit circle, and arc length.',
           videos:[
-            {rank:1, t:'Radians & Degrees / The Unit Circle — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — conversions and the unit circle.'},
+            {rank:1, t:'Coterminal Angles & Degree–Radian Conversion', ch:'The Organic Chemistry Tutor', id:'6BRtPfofXog', note:'Degree-radian conversion and positive/negative coterminal angles on the unit circle.'},
             {rank:2, t:'Angles & the unit circle — practice', ch:'Khan Academy', url:'https://www.khanacademy.org/math/trigonometry', note:'Drill conversions and coterminal angles.'},
             {rank:3, t:'Trigonometry (lecture series)', ch:'Professor Leonard', url:LEONARD, note:'Deeper foundation for the whole unit.'}
           ],
@@ -1438,7 +1761,7 @@ $\dfrac{\pi}{2}$ @@ $\dfrac{\pi}{4}$ @@ $\dfrac{2\pi}{3}$ @@ $\dfrac{3\pi}{2}$ @
             {part:'B', sols: items(R`
 $60^\circ$ @@ $135^\circ$ @@ $180^\circ$ @@ $150^\circ$`)},
             {part:'C', sols: items(R`
-$390^\circ$ (or $-330^\circ$) @@ $90^\circ$ @@ $315^\circ$`)},
+$390^\circ$ @@ $90^\circ$ @@ $315^\circ$`)},
             {part:'D', sols: items(R`
 $\dfrac{5\pi}{3}$ @@ $5\pi$ @@ $6$`)},
             {part:'E', sols: items(R`
@@ -1451,7 +1774,7 @@ the formula comes from the radian definition (arc over radius); degrees would ne
           id:'6.2', name:'Sine & Cosine: Definitions & Special Values',
           blurb:'Defining sine and cosine on the unit circle, the exact values at special angles, signs by quadrant, and reference angles.',
           videos:[
-            {rank:1, t:'Unit Circle / Evaluating Trig Functions — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — special values and reference angles.'},
+            {rank:1, t:'The Unit Circle: Sine & Cosine Special Values', ch:'The Organic Chemistry Tutor', id:'57VrEiEPD1I', note:'Builds the unit circle from scratch with sine and cosine special values and reference angles.'},
             {rank:2, t:'The unit circle — practice', ch:'Khan Academy', url:'https://www.khanacademy.org/math/trigonometry', note:'Drill special values and signs.'},
             {rank:3, t:'Trigonometric functions (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment of the unit circle.'}
           ],
@@ -1495,7 +1818,7 @@ at $90^\circ$ the point is $(0,1)$, and cosine is the $x$-coordinate, which is $
           id:'6.3', name:'Graphs of Sine & Cosine',
           blurb:'The shape of the sine and cosine waves, and reading amplitude, period, and midline from $y=A\\sin(Bx)+D$.',
           videos:[
-            {rank:1, t:'Graphing Sine & Cosine Functions — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — amplitude, period, and key points.'},
+            {rank:1, t:'Graphing Sine & Cosine: Amplitude, Period & Phase', ch:'The Organic Chemistry Tutor', id:'Vw-RwPBWS8g', note:'Amplitude, period, midline, and phase shift on sine and cosine graphs.'},
             {rank:2, t:'Graphs of sine & cosine — practice', ch:'Khan Academy', url:'https://www.khanacademy.org/math/trigonometry', note:'Drill amplitude, period, and midline.'},
             {rank:3, t:'Graphing trig functions (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment of the graphs.'}
           ],
@@ -1533,7 +1856,7 @@ it compresses the wave horizontally — more cycles in the same width (shorter p
           id:'6.4', name:'Sinusoidal Models',
           blurb:'The full sinusoid $y=A\\sin(B(x-C))+D$ and building one to model real periodic data like temperature or tides.',
           videos:[
-            {rank:1, t:'Sinusoidal Functions & Word Problems — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — phase shift and modeling.'},
+            {rank:1, t:'Modeling Daily Temperatures with a Sinusoid', ch:'Mathispower4u', id:'fP4TageF50Q', note:'A real-data sinusoidal model of daily temperatures — the modeling skill 6.4 is about.'},
             {rank:2, t:'Modeling with sinusoids — practice', ch:'Khan Academy', url:'https://www.khanacademy.org/math/trigonometry', note:'Build models from amplitude, period, and midline.'},
             {rank:3, t:'Sinusoidal applications (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment of periodic models.'}
           ],
@@ -1576,7 +1899,7 @@ half the temperature swing — how far it rises above and falls below the averag
           id:'6.5', name:'Tangent, Reciprocal & Inverse Trig',
           blurb:'Tangent and the reciprocal functions, the tangent graph, and inverse trig functions for recovering angles.',
           videos:[
-            {rank:1, t:'Tangent & Reciprocal Functions / Inverse Trig — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — the other four functions and inverses.'},
+            {rank:1, t:'Evaluating Inverse Trig Functions', ch:'The Organic Chemistry Tutor', id:'jt7p-mCC0ng', note:'Evaluating inverse trig functions, the hardest part of 6.5, with reciprocal functions alongside.'},
             {rank:2, t:'Tangent & inverse trig — practice', ch:'Khan Academy', url:'https://www.khanacademy.org/math/trigonometry', note:'Drill the reciprocal and inverse functions.'},
             {rank:3, t:'Tangent & inverse functions (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment.'}
           ],
@@ -1623,7 +1946,7 @@ sine repeats, so without a restricted range the inverse would not be a function 
           id:'6.6', name:'Triangle Trig & the Laws',
           blurb:'Right-triangle ratios (SOH-CAH-TOA), solving right triangles, and the Laws of Sines and Cosines for any triangle.',
           videos:[
-            {rank:1, t:'Right Triangle Trig / Law of Sines & Cosines — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — SOH-CAH-TOA and both laws.'},
+            {rank:1, t:'Right-Triangle Trig: SOH-CAH-TOA', ch:'Cognito', id:'WFH_7n7hpHo', note:'A clean right-triangle SOH-CAH-TOA foundation before the Laws of Sines and Cosines.'},
             {rank:2, t:'Right triangles & the laws — practice', ch:'Khan Academy', url:'https://www.khanacademy.org/math/trigonometry', note:'Drill triangle solving.'},
             {rank:3, t:'Triangle trigonometry (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment of the laws.'}
           ],
@@ -1668,7 +1991,7 @@ when you have SAS or SSS (no side-with-its-opposite-angle pair) @@ when $C=90^\c
           id:'6.7', name:'Trig Identities & Equations',
           blurb:'The Pythagorean and related identities, simplifying and verifying expressions, and solving trigonometric equations.',
           videos:[
-            {rank:1, t:'Trig Identities / Solving Trig Equations — find in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Best first watch — identities and equation solving.'},
+            {rank:1, t:'Solving Trigonometric Equations', ch:'The Organic Chemistry Tutor', id:'VMAMARmmDac', note:'Solving trig equations using identities and factoring, with general solutions.'},
             {rank:2, t:'Trig identities & equations — practice', ch:'Khan Academy', url:'https://www.khanacademy.org/math/trigonometry', note:'Drill identities and solving.'},
             {rank:3, t:'Trig identities (lecture)', ch:'Professor Leonard', url:LEONARD, note:'Deeper treatment of identities.'}
           ],
@@ -1713,7 +2036,7 @@ the point $(\cos\theta,\sin\theta)$ lies on the unit circle $x^2+y^2=1$ @@ trig 
           id:'7.1', name:'Comparing All Families; Choosing a Model',
           blurb:'Recognizing which function family fits a given table, scenario, or graph — the deciding skill the whole course builds toward.',
           videos:[
-            {rank:1, t:'Function families review — find function topics in the playlist', ch:'The Organic Chemistry Tutor', url:'https://www.youtube.com/playlist?list=PL0o_zxa4K1BU5sTWZ2YxFhpXwsnMfMke7', note:'Review the families and how their graphs differ.'},
+            {rank:1, t:'Identify Linear, Quadratic, or Exponential from a Table', ch:'Mario’s Math Tutoring', id:'RTUq3hFY0aM', note:'Identify the family from a table and write its equation — the core decision of 7.1.'},
             {rank:2, t:'Modeling with functions — practice', ch:'Khan Academy', url:'https://www.khanacademy.org/math/precalculus', note:'Practice choosing the right model from data.'},
             {rank:3, t:'Precalculus review (lecture series)', ch:'Professor Leonard', url:LEONARD, note:'Revisit any family before the capstone.'}
           ],
@@ -1729,7 +2052,7 @@ the point $(\cos\theta,\sin\theta)$ lies on the unit circle $x^2+y^2=1$ @@ trig 
 <div class="callout formula"><span class="co-label">The first test, always</span>Take equal steps in $x$. Constant difference means linear; constant ratio means exponential. If neither, look at the shape: oscillation points to trig, a ceiling points to a logarithm, asymptotes point to a rational function.</div>
 <div class="callout warn"><span class="co-label">Common errors</span>Checking only differences and missing a constant ratio. Forcing a line through data that clearly curves.</div>`,
           ws:[
-            {part:'A — Identify the family from the table', items: items(R`
+            {part:'A — Identify the family from the table (inputs $x=1,2,3,4$)', items: items(R`
 $y=2,5,8,11$ @@ $y=3,6,12,24$ @@ $y=1,8,27,64$ @@ $y=0,1,0,-1,0$ (repeating)`)},
             {part:'B — Identify the family from the scenario', items: items(R`
 Bacteria that double every hour @@ A car driven at a steady speed @@ The swing of a pendulum over time @@ The area of a circle as the radius grows`)},
@@ -1757,7 +2080,7 @@ a linear table has a constant difference between terms; an exponential table has
           id:'7.2', name:'Capstone Modeling & Calculus Readiness',
           blurb:'Putting the whole course together on multi-step problems, and seeing how each precalculus idea becomes a calculus idea.',
           videos:[
-            {rank:1, t:'Essence of Calculus (intuition for what comes next)', ch:'3Blue1Brown', url:'https://www.youtube.com/@3blue1brown', note:'A beautiful preview of where these skills lead.'},
+            {rank:1, t:'Average vs. Instantaneous Rate of Change (Secant → Tangent)', ch:'The Organic Chemistry Tutor', id:'29wLn0lFCWg', note:'Connects average rate of change (secant) to instantaneous rate (tangent) — the bridge to calculus.'},
             {rank:2, t:'Precalculus review for calculus — practice', ch:'Khan Academy', url:'https://www.khanacademy.org/math/precalculus', note:'Mixed review across every family.'},
             {rank:3, t:'Function review (lecture series)', ch:'Professor Leonard', url:LEONARD, note:'Solidify any topic before calculus.'}
           ],
@@ -1811,7 +2134,7 @@ most real-world questions are about how things change, and the derivative measur
         {title:'Section 4 — Lines & Graphs', q: items(R`Slope through $(1,2)$ and $(4,11)$ @@ Slope-intercept line, slope $3$ through $(0,-4)$ @@ Slope of any line parallel to $y=-2x+7$ @@ Vertical intercept of $4x-2y=8$ @@ Is $(2,5)$ on $y=2x+1$?`)},
         {title:'Section 5 — Functions Readiness', q: items(R`$f(x)=3x-4$: find $f(5)$ @@ $f(x)=x^2+1$: find $f(-2)$ @@ Domain of $f(x)=\dfrac1{x-6}$ @@ Is $\{(1,2),(2,2),(3,4)\}$ a function? @@ $f(x)=2x$: solve $f(x)=10$`)}
       ],
-      rubric: R`<p>Four points per question. Use your section scores to target review: Section 1 → exponent and fraction rules; Section 2 → factoring and simplifying; Section 3 → equation solving; Section 4 → lines and slope (Unit 2 material); Section 5 → function basics (begin Unit 1 carefully).</p>
+      rubric: R`<p>Four points per question. Use your section scores to target review: Section 1 → Unit 0.1 (fractions, signs) and 0.2 (exponents); Section 2 → Unit 0.3 (factoring and simplifying); Section 3 → Unit 0.4 (solving equations); Section 4 → Unit 2 (lines and slope); Section 5 → Unit 1 (function basics). Start in the Algebra Toolkit (Unit 0) wherever you missed.</p>
 <p><strong>By total score:</strong> 90–100 strong readiness (possibly near MATH 110); 75–89 solid, proceed normally; 60–74 some gaps, review the sections you missed; below 60 significant gaps — do a prerequisite algebra review first.</p>`,
       key:[
         {label:'Section 1', s: items(R`$\dfrac{11}{12}$ @@ $\dfrac23$ @@ $\dfrac18$ @@ $x^3$ @@ $x^5$`)},
@@ -1839,7 +2162,7 @@ $\dfrac{2xh+h^2}{h}=\mathbf{2x+h}$ @@ $x\ge-4,\ x\neq1$: $\mathbf{[-4,1)\cup(1,\
       ]
     },
     {
-      id:'unit2', name:'Unit 2 Test — Linear Functions', time:'50 minutes', points:'100 points', items:'16 questions',
+      id:'unit2', name:'Unit 2 Test — Linear Functions', time:'50 minutes', points:'100 points', items:'15 questions',
       intro:'Covers 2.1–2.3. Scientific calculator allowed; no graphing calculator. Show all work on free response; partial credit follows the rubric.',
       sections:[
         {title:'Part I — Multiple choice / short answer (5 pts each)', q: items(R`
@@ -1858,12 +2181,12 @@ $m=\dfrac{11-2}{4-1}=3$; $y-2=3(x-1)\Rightarrow \mathbf{y=3x-1}$ @@ (a) $C(t)=40
       id:'unit3', name:'Unit 3 Test — Transformations', time:'45 minutes', points:'100 points', items:'14 questions',
       intro:'Covers 3.1–3.2. Scientific calculator allowed; no graphing calculator. Show all work on free response; partial credit follows the rubric.',
       sections:[
-        {title:'Part I — Multiple choice / short answer (5 pts each)', q: items(R`
+        {title:'Part I — Multiple choice / short answer (6 pts each)', q: items(R`
 Which way and how far does $f(x-2)$ shift the graph? @@ $-f(x)$ reflects over which axis? @@ What does $f(x)+5$ do? @@ $f(2x)$ is a horizontal ___ by what factor? @@ If $(3,4)$ is on $f$, where is it on $f(x)-1$? @@ If $(3,4)$ is on $f$, where is it on $f(-x)$? @@ $3f(x)$ is a vertical ___ by what factor? @@ Parent function of $g(x)=\sqrt{x-2}+1$`)},
         {title:'Part II — Free response (show work)', q: items(R`
 (8 pts) Describe, in order, every transformation in $g(x)=-2f(x-3)+1$ @@ (8 pts) The point $(4,6)$ is on $f$ — find its image under $g(x)=\tfrac12 f(x+2)-1$ @@ (8 pts) Starting from $y=x^2$, write the equation for "right $3$, down $4$" and give the vertex @@ (8 pts) $f$ has domain $[-2,6]$ and range $[0,10]$ — give the domain and range of $-f(x)$ and of $f(2x)$ @@ (10 pts) Write the transformation of $y=|x|$ that is reflected over the $x$-axis, stretched vertically by $3$, shifted left $2$ and up $5$; state its vertex @@ (10 pts) Explain why $f(x+3)$ and $f(x)+3$ give different graphs, and describe each`)}
       ],
-      rubric: R`<p>Part I is all-or-nothing, 5 points each. For each Part II problem: setup/approach 30%, execution 40%, final answer 20%, form & communication 10%. Follow-through credit applies.</p><p><strong>Grade scale:</strong> 93–100 A, 90–92 A−, 87–89 B+, 83–86 B, 80–82 B−, 77–79 C+, 73–76 C, 70–72 C−, 60–69 D, below 60 F. <strong>Mastery:</strong> ≥90% advance; 80–89% review misses; 70–79% redo related worksheets; below 70% re-study and retake.</p>`,
+      rubric: R`<p>Part I is all-or-nothing, 6 points each. For each Part II problem: setup/approach 30%, execution 40%, final answer 20%, form & communication 10%. Follow-through credit applies.</p><p><strong>Grade scale:</strong> 93–100 A, 90–92 A−, 87–89 B+, 83–86 B, 80–82 B−, 77–79 C+, 73–76 C, 70–72 C−, 60–69 D, below 60 F. <strong>Mastery:</strong> ≥90% advance; 80–89% review misses; 70–79% redo related worksheets; below 70% re-study and retake.</p>`,
       key:[
         {label:'Part I', s: items(R`right $2$ @@ the $x$-axis @@ shifts up $5$ @@ compression by $\tfrac12$ @@ $(3,3)$ @@ $(-3,4)$ @@ stretch by $3$ @@ $\sqrt{x}$`)},
         {label:'Part II', s: items(R`
@@ -1874,12 +2197,12 @@ right $3$; reflect over the $x$-axis with a vertical stretch by $2$; up $1$ @@ $
       id:'unit4', name:'Unit 4 Test — Polynomial & Rational', time:'60 minutes', points:'100 points', items:'16 questions',
       intro:'Covers 4.1–4.5. Scientific calculator allowed; no graphing calculator. Show all work on free response; partial credit follows the rubric.',
       sections:[
-        {title:'Part I — Multiple choice / short answer (5 pts each)', q: items(R`
+        {title:'Part I — Multiple choice / short answer (4 pts each)', q: items(R`
 Vertex of $y=2(x-1)^2+3$ @@ Sign of the discriminant of $x^2+x+1$ @@ End behavior of $y=-x^4+x$ @@ At a zero of multiplicity $2$, the graph does what? @@ Horizontal asymptote of $\dfrac{3x+1}{x-2}$ @@ Vertical asymptote of $\dfrac{x}{x-5}$ @@ $(f\circ g)(x)$ for $f(x)=x+1,\ g(x)=2x$ @@ Inverse of $f(x)=2x-4$`)},
         {title:'Part II — Free response (show work)', q: items(R`
 (8 pts) Complete the square for $y=x^2-6x+5$ and give the vertex @@ (8 pts) Solve $x^2-2x-8=0$ by factoring and state the discriminant @@ (8 pts) For $f(x)=(x+2)^2(x-3)$, give the end behavior and each zero with its multiplicity (cross or bounce) @@ (8 pts) For $f(x)=\dfrac{x+1}{x^2-4}$, give the domain, vertical asymptotes, horizontal asymptote, and $x$-intercept @@ (8 pts) Find the inverse of $f(x)=\dfrac{x-1}{3}$ and verify by composing one way @@ (8 pts) $y$ varies inversely with $x$ and $y=8$ when $x=3$ — find the equation and $y$ when $x=6$ @@ (10 pts) For $f(x)=x^2+2$ and $g(x)=x-1$, find $(f\circ g)(x)$ and $(g\circ f)(x)$ and evaluate each at $x=3$ @@ (10 pts) A rectangle has perimeter $24$ — express area as a function of width, then find the maximum area and the dimensions`)}
       ],
-      rubric: R`<p>Part I is all-or-nothing, 5 points each. For each Part II problem: setup/approach 30%, execution 40%, final answer 20%, form & communication 10%. Follow-through credit applies; split multi-part items evenly.</p><p><strong>Grade scale:</strong> 93–100 A, 90–92 A−, 87–89 B+, 83–86 B, 80–82 B−, 77–79 C+, 73–76 C, 70–72 C−, 60–69 D, below 60 F. <strong>Mastery:</strong> ≥90% advance; 80–89% review misses; 70–79% redo related worksheets; below 70% re-study and retake.</p>`,
+      rubric: R`<p>Part I is all-or-nothing, 4 points each. For each Part II problem: setup/approach 30%, execution 40%, final answer 20%, form & communication 10%. Follow-through credit applies; split multi-part items evenly.</p><p><strong>Grade scale:</strong> 93–100 A, 90–92 A−, 87–89 B+, 83–86 B, 80–82 B−, 77–79 C+, 73–76 C, 70–72 C−, 60–69 D, below 60 F. <strong>Mastery:</strong> ≥90% advance; 80–89% review misses; 70–79% redo related worksheets; below 70% re-study and retake.</p>`,
       key:[
         {label:'Part I', s: items(R`$(1,3)$ @@ negative (no real roots) @@ both ends down @@ touches and turns (bounces) @@ $y=3$ @@ $x=5$ @@ $2x+1$ @@ $\dfrac{x+4}{2}$`)},
         {label:'Part II', s: items(R`
@@ -1890,12 +2213,12 @@ $(x-3)^2-4$, vertex $\mathbf{(3,-4)}$ @@ $(x-4)(x+2)=0\Rightarrow x=4,-2$; discr
       id:'unit5', name:'Unit 5 Test — Exponential & Logarithmic', time:'60 minutes', points:'100 points', items:'16 questions',
       intro:'Covers 5.1–5.5. Scientific calculator allowed; no graphing calculator. Show all work on free response; partial credit follows the rubric.',
       sections:[
-        {title:'Part I — Multiple choice / short answer (5 pts each)', q: items(R`
+        {title:'Part I — Multiple choice / short answer (4 pts each)', q: items(R`
 Is $f(x)=4\cdot(0.5)^x$ growth or decay? @@ Initial value of $f(x)=3\cdot2^x$ @@ Evaluate $\log_2 32$ @@ Convert $3^3=27$ to log form @@ Solve $2^x=16$ @@ Simplify $\ln e^x$ @@ Expand $\log(xy)$ @@ Horizontal asymptote of $f(x)=2^x$`)},
         {title:'Part II — Free response (show work)', q: items(R`
 (8 pts) Solve $3^x=20$ (exact and approximate) @@ (8 pts) Solve $\log_2(x-1)=4$ @@ (8 pts) A population of $500$ grows $4\%$ per year — write the model and set up and solve for when it doubles @@ (8 pts) Condense $2\log x+\log y-\log z$ @@ (8 pts) Is the table $x=0,1,2,3$, $y=4,12,36,108$ linear or exponential? Write the function @@ (8 pts) A $100$-mg sample has a half-life of $8$ hours — write $A(t)$ and find the amount after $24$ hours @@ (10 pts) Solve $\log_2 x+\log_2(x-2)=3$ @@ (10 pts) $1000$ dollars is invested at $6\%$ compounded continuously — write $A(t)$ and find the time to reach $2000$`)}
       ],
-      rubric: R`<p>Part I is all-or-nothing, 5 points each. For each Part II problem: setup/approach 30%, execution 40%, final answer 20%, form & communication 10%. Follow-through credit applies; split multi-part items evenly.</p><p><strong>Grade scale:</strong> 93–100 A, 90–92 A−, 87–89 B+, 83–86 B, 80–82 B−, 77–79 C+, 73–76 C, 70–72 C−, 60–69 D, below 60 F. <strong>Mastery:</strong> ≥90% advance; 80–89% review misses; 70–79% redo related worksheets; below 70% re-study and retake.</p>`,
+      rubric: R`<p>Part I is all-or-nothing, 4 points each. For each Part II problem: setup/approach 30%, execution 40%, final answer 20%, form & communication 10%. Follow-through credit applies; split multi-part items evenly.</p><p><strong>Grade scale:</strong> 93–100 A, 90–92 A−, 87–89 B+, 83–86 B, 80–82 B−, 77–79 C+, 73–76 C, 70–72 C−, 60–69 D, below 60 F. <strong>Mastery:</strong> ≥90% advance; 80–89% review misses; 70–79% redo related worksheets; below 70% re-study and retake.</p>`,
       key:[
         {label:'Part I', s: items(R`decay @@ $3$ @@ $5$ @@ $\log_3 27=3$ @@ $x=4$ @@ $x$ @@ $\log x+\log y$ @@ $y=0$`)},
         {label:'Part II', s: items(R`
@@ -1906,12 +2229,12 @@ $x=\dfrac{\ln 20}{\ln 3}\approx2.73$ @@ $x-1=16\Rightarrow x=17$ @@ $P(t)=500(1.
       id:'unit6', name:'Unit 6 Test — Trigonometry', time:'65 minutes', points:'100 points', items:'16 questions',
       intro:'Covers 6.1–6.7. Scientific calculator allowed; no graphing calculator. Show all work on free response; partial credit follows the rubric.',
       sections:[
-        {title:'Part I — Multiple choice / short answer (5 pts each)', q: items(R`
+        {title:'Part I — Multiple choice / short answer (4 pts each)', q: items(R`
 Convert $60^\circ$ to radians @@ $\sin 30^\circ$ @@ $\cos 90^\circ$ @@ Period of $y=\sin(2x)$ @@ Amplitude of $y=3\cos x$ @@ $\tan 45^\circ$ @@ $\arcsin 1$ @@ In a right triangle with opposite $5$ and hypotenuse $13$, find $\sin\theta$`)},
         {title:'Part II — Free response (show work)', q: items(R`
 (8 pts) Convert $\dfrac{5\pi}{6}$ to degrees and find a coterminal angle of $400^\circ$ in $[0^\circ,360^\circ)$ @@ (8 pts) Find $\sin 210^\circ$ and $\cos 225^\circ$ using reference angles @@ (8 pts) Give the amplitude, period, midline, max, and min of $y=4\sin(2x)-1$ @@ (8 pts) Temperature varies between $40$ and $60$ degrees over $24$ hours — give $A$, $D$, $B$ and a sinusoidal model @@ (8 pts) A right triangle has hypotenuse $20$ and an angle of $30^\circ$ — find both legs @@ (8 pts) Use the Law of Cosines with $a=6$, $b=8$, $C=60^\circ$ to find $c$ @@ (10 pts) If $\sin\theta=\tfrac35$ and $\theta$ is in QII, find $\cos\theta$ and $\tan\theta$ @@ (10 pts) Solve on $[0,2\pi)$: $2\cos\theta-1=0$, and separately $\tan\theta=1$`)}
       ],
-      rubric: R`<p>Part I is all-or-nothing, 5 points each. For each Part II problem: setup/approach 30%, execution 40%, final answer 20%, form & communication 10%. Follow-through credit applies; split multi-part items evenly.</p><p><strong>Grade scale:</strong> 93–100 A, 90–92 A−, 87–89 B+, 83–86 B, 80–82 B−, 77–79 C+, 73–76 C, 70–72 C−, 60–69 D, below 60 F. <strong>Mastery:</strong> ≥90% advance; 80–89% review misses; 70–79% redo related worksheets; below 70% re-study and retake.</p>`,
+      rubric: R`<p>Part I is all-or-nothing, 4 points each. For each Part II problem: setup/approach 30%, execution 40%, final answer 20%, form & communication 10%. Follow-through credit applies; split multi-part items evenly.</p><p><strong>Grade scale:</strong> 93–100 A, 90–92 A−, 87–89 B+, 83–86 B, 80–82 B−, 77–79 C+, 73–76 C, 70–72 C−, 60–69 D, below 60 F. <strong>Mastery:</strong> ≥90% advance; 80–89% review misses; 70–79% redo related worksheets; below 70% re-study and retake.</p>`,
       key:[
         {label:'Part I', s: items(R`$\dfrac{\pi}{3}$ @@ $\tfrac12$ @@ $0$ @@ $\pi$ @@ $3$ @@ $1$ @@ $\dfrac{\pi}{2}$ @@ $\tfrac{5}{13}$`)},
         {label:'Part II', s: items(R`
@@ -1923,9 +2246,9 @@ $150^\circ$; coterminal $40^\circ$ @@ $\sin 210^\circ=-\tfrac12$, $\cos 225^\cir
       intro:'Covers 7.1–7.2 and pulls from the whole course. Scientific calculator allowed; no graphing calculator. Show all work on free response.',
       sections:[
         {title:'Part I — Short answer (5 pts each)', q: items(R`
-A constant ratio in a table signals which family? @@ A constant difference signals which family? @@ Oscillating data signals which family? @@ The difference quotient becomes which calculus object? @@ A vertical asymptote corresponds to which calculus idea? @@ Values $1,8,27$ signal which family?`)},
+A constant ratio in a table signals which family? @@ A constant difference signals which family? @@ Oscillating data signals which family? @@ The difference quotient becomes which calculus object? @@ A vertical asymptote corresponds to which calculus idea? @@ For inputs $x=1,2,3$, the outputs $1,8,27$ signal which family?`)},
         {title:'Part II — Free response (show work)', q: items(R`
-(10 pts) Classify each table: (a) $2,4,6,8$; (b) $2,4,8,16$; (c) $1,4,9,16$ @@ (10 pts) A population of $300$ grows $6\%$ per year — write the model and set up and solve for when it triples @@ (10 pts) For $h(t)=-16t^2+32t$, find when it lands and its maximum height @@ (10 pts) Match each precalculus idea to its calculus successor: average rate of change; composition; area under a curve @@ (15 pts) A Ferris wheel has diameter $50$, center height $30$, and one rotation every $40$ s — write a sinusoidal model for height and give amplitude, midline, and period @@ (15 pts) Identify the family and write a function for the data $(0,3),(1,6),(2,12),(3,24)$`)}
+(10 pts) Classify each table (inputs $x=1,2,3,4$): (a) $2,4,6,8$; (b) $2,4,8,16$; (c) $1,4,9,16$ @@ (10 pts) A population of $300$ grows $6\%$ per year — write the model and set up and solve for when it triples @@ (10 pts) For $h(t)=-16t^2+32t$, find when it lands and its maximum height @@ (10 pts) Match each precalculus idea to its calculus successor: average rate of change; composition; area under a curve @@ (15 pts) A Ferris wheel has diameter $50$, center height $30$, and one rotation every $40$ s — write a sinusoidal model for height and give amplitude, midline, and period @@ (15 pts) Identify the family and write a function for the data $(0,3),(1,6),(2,12),(3,24)$`)}
       ],
       rubric: R`<p>Part I is all-or-nothing, 5 points each. For each Part II problem: setup/approach 30%, execution 40%, final answer 20%, form & communication 10%. Follow-through credit applies; split multi-part items evenly.</p><p><strong>Grade scale:</strong> 93–100 A, 90–92 A−, 87–89 B+, 83–86 B, 80–82 B−, 77–79 C+, 73–76 C, 70–72 C−, 60–69 D, below 60 F.</p>`,
       key:[
@@ -1935,7 +2258,7 @@ A constant ratio in a table signals which family? @@ A constant difference signa
       ]
     },
     {
-      id:'midterm', name:'Midterm Exam — Units 1–4', time:'110 minutes', points:'150 points', items:'24 questions',
+      id:'midterm', name:'Midterm Exam — Units 1–4', time:'110 minutes', points:'158 points', items:'24 questions',
       intro:'Cumulative over Units 1–4 (functions, linear functions, transformations, polynomial & rational functions). Scientific calculator allowed; no graphing calculator. Show all work on free response.',
       sections:[
         {title:'Part I — Multiple choice / short answer (5 pts each)', q: items(R`
@@ -1943,7 +2266,7 @@ Is $\{(1,2),(1,3)\}$ a function? @@ For $f(x)=x^2-1$, find $f(-3)$ @@ Domain of 
         {title:'Part II — Free response (show work)', q: items(R`
 (8 pts) Difference quotient of $f(x)=x^2-3x$ @@ (8 pts) Domain of $\dfrac{\sqrt{x+2}}{x-1}$ @@ (8 pts) Determine whether $f(x)=x^4-2x^2$ is even, odd, or neither @@ (8 pts) Equation of the line through $(1,2)$ and $(4,11)$ @@ (8 pts) Line perpendicular to $y=2x-1$ through $(4,3)$ @@ (8 pts) Describe the transformations in $g(x)=-2f(x+1)-3$ @@ (8 pts) Complete the square for $y=x^2-6x+5$ and give the vertex @@ (8 pts) Solve $x^2-x-6=0$ and state the discriminant @@ (8 pts) End behavior and zeros (with multiplicity) of $f(x)=(x-1)^2(x+2)$ @@ (8 pts) For $f(x)=\dfrac{x+1}{x-2}$: domain, vertical asymptote, horizontal asymptote, and intercepts @@ (8 pts) Find the inverse of $f(x)=2x+3$ @@ (10 pts) A rectangle has perimeter $20$ — express area as a function of width and find the maximum area and dimensions`)}
       ],
-      rubric: R`<p>Part I is all-or-nothing, 5 points each (60 points). Part II is 90 points by the standard rubric: setup/approach 30%, execution 40%, final answer 20%, form & communication 10%. Follow-through credit applies.</p><p><strong>Grade scale:</strong> 93–100 A, 90–92 A−, 87–89 B+, 83–86 B, 80–82 B−, 77–79 C+, 73–76 C, 70–72 C−, 60–69 D, below 60 F. <strong>Mastery:</strong> ≥90% strong; below 70% revisit the weakest units before continuing.</p>`,
+      rubric: R`<p>Part I is all-or-nothing, 5 points each (60 points). Part II is 98 points by the standard rubric: setup/approach 30%, execution 40%, final answer 20%, form & communication 10%. Follow-through credit applies.</p><p><strong>Grade scale:</strong> 93–100 A, 90–92 A−, 87–89 B+, 83–86 B, 80–82 B−, 77–79 C+, 73–76 C, 70–72 C−, 60–69 D, below 60 F. <strong>Mastery:</strong> ≥90% strong; below 70% revisit the weakest units before continuing.</p>`,
       key:[
         {label:'Part I', s: items(R`no (one input, two outputs) @@ $8$ @@ $[5,\infty)$ @@ $4$ @@ $3$ @@ $-\tfrac12$ @@ right $2$ @@ the $x$-axis @@ $(3,2)$ @@ both ends down @@ $x=4$ @@ $x-5$`)},
         {label:'Part II', s: items(R`
@@ -1957,7 +2280,7 @@ $2x+h-3$ @@ $[-2,1)\cup(1,\infty)$ @@ $f(-x)=x^4-2x^2=f(x)$ → even @@ $m=3$, $
         {title:'Part I — Multiple choice / short answer (4 pts each)', q: items(R`
 Is $\{(1,2),(2,2)\}$ a function? @@ For $f(x)=2x^2+1$, find $f(-1)$ @@ Domain of $\dfrac{1}{x^2-9}$ @@ AROC of $x^2$ on $[2,4]$ @@ Slope through $(0,1)$ and $(2,7)$ @@ Slope parallel to $y=4x$ @@ $f(x)+3$ shifts the graph which way? @@ Vertex of $y=2(x-1)^2-5$ @@ End behavior of $y=x^3$ @@ Horizontal asymptote of $\dfrac{3x+1}{x-2}$ @@ Evaluate $\log_2 16$ @@ Solve $2^x=8$ @@ $\sin 30^\circ$ @@ Period of $y=\sin(2x)$`)},
         {title:'Part II — Free response (show work)', q: items(R`
-(8 pts) Difference quotient of $f(x)=x^2+2x$ @@ (8 pts) Domain of $\dfrac{\sqrt{x-1}}{x-4}$ @@ (8 pts) Equation of the line through $(2,5)$ and $(6,13)$ @@ (8 pts) Describe the transformations in $g(x)=3f(x-2)+1$ @@ (8 pts) Complete the square for $y=x^2+4x+1$ and give the vertex @@ (8 pts) Zeros with multiplicity and end behavior of $f(x)=(x+1)(x-2)^2$ @@ (8 pts) For $f(x)=\dfrac{2x}{x^2-1}$: domain, vertical asymptotes, horizontal asymptote @@ (8 pts) Find the inverse of $f(x)=\dfrac{x-1}{3}$ @@ (8 pts) Solve $\log_3(x+1)=2$ @@ (8 pts) A population of $400$ grows $3\%$ per year — set up and solve for when it doubles @@ (8 pts) Convert $135^\circ$ to radians and find $\sin 150^\circ$ @@ (8 pts) For $y=4\sin(2x)-1$: amplitude, period, midline, max, min @@ (8 pts) A right triangle has hypotenuse $10$ and a $30^\circ$ angle — find both legs @@ (8 pts) Law of Cosines with $a=5$, $b=6$, $C=60^\circ$ — find $c$ @@ (10 pts) If $\sin\theta=\tfrac45$ and $\theta$ is in QII, find $\cos\theta$ and $\tan\theta$ @@ (10 pts) Identify the family and write a function for $(0,2),(1,6),(2,18),(3,54)$ @@ (10 pts) A rectangle has perimeter $24$ — express area as a function of width and find the maximum area and dimensions`)}
+(10 pts) Difference quotient of $f(x)=x^2+2x$ @@ (8 pts) Domain of $\dfrac{\sqrt{x-1}}{x-4}$ @@ (8 pts) Equation of the line through $(2,5)$ and $(6,13)$ @@ (8 pts) Describe the transformations in $g(x)=3f(x-2)+1$ @@ (8 pts) Complete the square for $y=x^2+4x+1$ and give the vertex @@ (8 pts) Zeros with multiplicity and end behavior of $f(x)=(x+1)(x-2)^2$ @@ (8 pts) For $f(x)=\dfrac{2x}{x^2-1}$: domain, vertical asymptotes, horizontal asymptote @@ (8 pts) Find the inverse of $f(x)=\dfrac{x-1}{3}$ @@ (8 pts) Solve $\log_3(x+1)=2$ @@ (8 pts) A population of $400$ grows $3\%$ per year — set up and solve for when it doubles @@ (8 pts) Convert $135^\circ$ to radians and find $\sin 150^\circ$ @@ (8 pts) For $y=4\sin(2x)-1$: amplitude, period, midline, max, min @@ (8 pts) A right triangle has hypotenuse $10$ and a $30^\circ$ angle — find both legs @@ (8 pts) Law of Cosines with $a=5$, $b=6$, $C=60^\circ$ — find $c$ @@ (10 pts) If $\sin\theta=\tfrac45$ and $\theta$ is in QII, find $\cos\theta$ and $\tan\theta$ @@ (10 pts) Identify the family and write a function for $(0,2),(1,6),(2,18),(3,54)$ @@ (10 pts) A rectangle has perimeter $24$ — express area as a function of width and find the maximum area and dimensions`)}
       ],
       rubric: R`<p>Part I is all-or-nothing, 4 points each (56 points). Part II is 144 points by the standard rubric: setup/approach 30%, execution 40%, final answer 20%, form & communication 10%. Follow-through credit applies.</p><p><strong>Grade scale:</strong> 93–100 A, 90–92 A−, 87–89 B+, 83–86 B, 80–82 B−, 77–79 C+, 73–76 C, 70–72 C−, 60–69 D, below 60 F.</p>`,
       key:[
@@ -1996,13 +2319,14 @@ function unitProgress(u){
 
 /* ----- routing ----- */
 let route = {type:'overview'};
-function go(r){ route=r; Store.set('last', JSON.stringify(r)); render(); closeDrawer(); window.scrollTo({top:0,behavior:'smooth'}); }
+function go(r){ route=r; Store.set('last', JSON.stringify(r)); render(); closeDrawer(); const rm=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches; window.scrollTo({top:0,behavior:rm?'auto':'smooth'}); }
 
 function updateRing(){
   const tot=totalItems(), d=doneItems(), pct = tot? Math.round(d/tot*100):0;
   const C=2*Math.PI*16;
   document.getElementById('ringFill').style.strokeDashoffset = C*(1-pct/100);
   document.getElementById('ringPct').textContent = pct+'%';
+  const rw=document.getElementById('ringWrap'); if(rw) rw.setAttribute('aria-label','Course progress: '+pct+' percent complete, '+d+' of '+tot+' items');
 }
 
 /* ----- sidebar ----- */
@@ -2061,7 +2385,7 @@ function vidCard(v){
   const watch = v.id ? 'https://www.youtube.com/watch?v='+v.id : v.url;
   let actions = '';
   if(v.id){
-    actions += '<button class="btn-sm primary" data-embed="'+v.id+'">Watch here</button>';
+    actions += '<button class="btn-sm primary" data-embed="'+v.id+'" data-embed-title="'+escapeHtml(v.t)+'" aria-expanded="false">Watch here</button>';
     actions += '<a class="btn-sm" href="'+watch+'" target="_blank" rel="noopener">Open on YouTube</a>';
   } else {
     actions += '<a class="btn-sm primary" href="'+watch+'" target="_blank" rel="noopener">Open video</a>';
@@ -2092,15 +2416,16 @@ function renderSub(id){
   h += '<div class="progress-chips">';
   SUB_PARTS.forEach(([k,label])=>{
     const on = Store.sub(s.id+':'+k);
-    h += '<button class="chip'+(on?' on':'')+'" data-mark="'+s.id+':'+k+'"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M5 12l5 5L20 6"/></svg></span>'+label+'</button>';
+    h += '<button class="chip'+(on?' on':'')+'" aria-pressed="'+(on?'true':'false')+'" data-mark="'+s.id+':'+k+'"><span class="box" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M5 12l5 5L20 6"/></svg></span>'+label+'</button>';
   });
   h += '</div>';
-  // tabs
-  h += '<div class="tabs">';
+  // tabs (WAI-ARIA tabs pattern)
+  h += '<div class="tabs" role="tablist" aria-label="Lesson views">';
   [['lesson','Lesson'],['worksheet','Worksheet'],['key','Answer key']].forEach(([k,label],i)=>{
-    h += '<button class="tab'+(tab===k?' active':'')+'" data-tab="'+k+'">'+label+'</button>';
+    const sel = tab===k;
+    h += '<button class="tab'+(sel?' active':'')+'" role="tab" id="tab-'+k+'" aria-selected="'+(sel?'true':'false')+'" aria-controls="panelBody" tabindex="'+(sel?'0':'-1')+'" data-tab="'+k+'">'+label+'</button>';
   });
-  h += '</div><div class="panel-body" id="panelBody">';
+  h += '</div><div class="panel-body" id="panelBody" role="tabpanel" aria-labelledby="tab-'+tab+'" tabindex="0">';
   if(tab==='lesson'){
     h += '<div class="cs">'+s.cs+'</div>';
     h += '<h4 style="font-family:var(--font-display);font-size:20px;margin:28px 0 6px">Ranked videos</h4>';
@@ -2123,7 +2448,7 @@ function renderSub(id){
   // notes
   h += '<div class="notes"><label><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg> My notes for '+s.id+'</label>'
     +'<textarea id="noteArea" placeholder="Jot down sticking points, formulas to remember, or questions for your tutor…">'+escapeHtml(Store.note(s.id))+'</textarea>'
-    +'<div class="saved" id="noteSaved"></div></div>';
+    +'<div class="saved" id="noteSaved" aria-live="polite"></div></div>';
   // pager
   const list = unlockedSubs(); const idx = list.findIndex(x=>x.s.id===id);
   const prev = idx>0?list[idx-1]:null, next = idx<list.length-1?list[idx+1]:null;
@@ -2137,20 +2462,29 @@ function renderSub(id){
 const revealed = {};
 function wireSub(s){
   view.querySelectorAll('[data-mark]').forEach(b=>b.addEventListener('click',()=>{
-    Store.toggle(b.getAttribute('data-mark')); b.classList.toggle('on'); updateRing(); refreshSidebarState();
+    const on=Store.toggle(b.getAttribute('data-mark')); b.classList.toggle('on',on); b.setAttribute('aria-pressed',on?'true':'false'); updateRing(); refreshSidebarState();
   }));
-  view.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{ route.tab=b.getAttribute('data-tab'); renderSub(s.id); }));
-  view.querySelectorAll('[data-reveal]').forEach(b=>b.addEventListener('click',()=>{ revealed[s.id]=true; renderSub(s.id); }));
-  view.querySelectorAll('[data-hide]').forEach(b=>b.addEventListener('click',()=>{ revealed[s.id]=false; renderSub(s.id); }));
+  view.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>{ route.tab=b.getAttribute('data-tab'); renderSub(s.id); const nt=view.querySelector('.tab.active'); if(nt) nt.focus(); }));
+  const tablist=view.querySelector('[role="tablist"]');
+  if(tablist) tablist.addEventListener('keydown',e=>{
+    const tabs=Array.prototype.slice.call(tablist.querySelectorAll('[role="tab"]'));
+    const i=tabs.indexOf(document.activeElement); if(i<0) return; let j=i;
+    if(e.key==='ArrowRight'||e.key==='ArrowDown') j=(i+1)%tabs.length;
+    else if(e.key==='ArrowLeft'||e.key==='ArrowUp') j=(i-1+tabs.length)%tabs.length;
+    else if(e.key==='Home') j=0; else if(e.key==='End') j=tabs.length-1; else return;
+    e.preventDefault(); tabs[j].focus(); tabs[j].click();
+  });
+  view.querySelectorAll('[data-reveal]').forEach(b=>b.addEventListener('click',()=>{ revealed[s.id]=true; renderSub(s.id); const hb=view.querySelector('[data-hide]'); if(hb) hb.focus(); }));
+  view.querySelectorAll('[data-hide]').forEach(b=>b.addEventListener('click',()=>{ revealed[s.id]=false; renderSub(s.id); const rb=view.querySelector('[data-reveal]'); if(rb) rb.focus(); }));
   view.querySelectorAll('[data-go]').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); route.tab='lesson'; go({type:'sub',id:a.getAttribute('data-go')}); }));
   view.querySelectorAll('[data-embed]').forEach(b=>b.addEventListener('click',()=>{
     const slot=b.closest('.vid').querySelector('.embed-slot');
-    if(slot.querySelector('iframe')){ slot.innerHTML=''; b.textContent='Watch here'; return; }
-    slot.innerHTML='<div class="embed"><iframe src="https://www.youtube-nocookie.com/embed/'+b.getAttribute('data-embed')+'" title="video" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>';
-    b.textContent='Close video';
+    if(slot.querySelector('iframe')){ slot.innerHTML=''; b.textContent='Watch here'; b.setAttribute('aria-expanded','false'); return; }
+    slot.innerHTML='<div class="embed" role="region" aria-label="Embedded video player"><iframe src="https://www.youtube-nocookie.com/embed/'+b.getAttribute('data-embed')+'" title="'+(b.getAttribute('data-embed-title')||'Video')+'" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>';
+    b.textContent='Close video'; b.setAttribute('aria-expanded','true');
   }));
   const ta=view.querySelector('#noteArea');
-  if(ta){ let t; ta.addEventListener('input',()=>{ Store.setNote(s.id,ta.value); const sv=view.querySelector('#noteSaved'); sv.textContent='Saved'; clearTimeout(t); t=setTimeout(()=>sv.textContent='',1200); }); }
+  if(ta){ let t; ta.addEventListener('input',()=>{ const sv=view.querySelector('#noteSaved'); try{ Store.setNote(s.id,ta.value); sv.textContent=Store.persists?'Saved':'Saved for this session only'; }catch(err){ sv.textContent='Could not save — storage unavailable'; } clearTimeout(t); t=setTimeout(()=>{ sv.textContent=''; },1600); }); }
   typeset(view);
 }
 
@@ -2180,8 +2514,8 @@ function renderTest(id){
   }
   // score + completion
   const sc = Store.score('test:'+id);
-  h += '<div class="score-box"><label for="scoreIn">Your score</label><input id="scoreIn" type="number" min="0" max="100" value="'+(sc!=null?sc:'')+'" placeholder="0–100"/>'
-    +'<span id="masteryOut">'+masteryBadge(sc)+'</span>'
+  h += '<div class="score-box"><label for="scoreIn">Your score</label><input id="scoreIn" type="number" min="0" max="100" inputmode="numeric" aria-describedby="masteryOut" value="'+(sc!=null?sc:'')+'" placeholder="0–100"/>'
+    +'<span id="masteryOut" aria-live="polite">'+masteryBadge(sc)+'</span>'
     +'<button class="chip'+(Store.sub('test:'+id)?' on':'')+'" data-mark-test="'+id+'" style="margin-left:auto"><span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M5 12l5 5L20 6"/></svg></span>Mark completed</button></div>';
   h += '</div>';
   view.innerHTML=h;
@@ -2219,7 +2553,7 @@ function renderOverview(){
     +'<li>Tick the three boxes to mark it done — the ring fills up.</li>'
     +'<li>After a unit, take its <strong>Test</strong> and log your score.</li>'
     +'</ol></div></div>';
-  h += '<hr class="rule"><div class="eyebrow">The plan</div><h1 class="page-title" style="font-size:26px">Seven units · twenty-eight subtopics</h1>';
+  h += '<hr class="rule"><div class="eyebrow">The plan</div><h1 class="page-title" style="font-size:26px">An algebra toolkit plus seven units · thirty-two subtopics</h1>';
   h += '<div class="roadmap">';
   COURSE.units.forEach(u=>{
     const ready=!u.locked;
@@ -2282,6 +2616,7 @@ function applyTheme(t){
   document.getElementById('themeIcon').innerHTML = t==='dark'
     ? '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'
     : '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>';
+  const tb=document.getElementById('themeBtn'); if(tb){ tb.setAttribute('aria-label', t==='dark'?'Switch to light mode':'Switch to dark mode'); tb.setAttribute('aria-pressed', t==='dark'?'true':'false'); }
 }
 document.getElementById('themeBtn').addEventListener('click',()=>applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark'));
 
@@ -2292,10 +2627,12 @@ document.getElementById('resetBtn').addEventListener('click',()=>{
 
 /* ----- drawer ----- */
 const scrim=document.getElementById('scrim');
-function openDrawer(){ sidebar.classList.add('open'); scrim.classList.add('show'); }
-function closeDrawer(){ sidebar.classList.remove('open'); scrim.classList.remove('show'); }
+let drawerPrevFocus=null;
+function openDrawer(){ sidebar.classList.add('open'); scrim.classList.add('show'); const mb=document.getElementById('menuBtn'); if(mb) mb.setAttribute('aria-expanded','true'); drawerPrevFocus=document.activeElement; const first=sidebar.querySelector('button,a,[tabindex]'); if(first) first.focus(); }
+function closeDrawer(){ const wasOpen=sidebar.classList.contains('open'); sidebar.classList.remove('open'); scrim.classList.remove('show'); const mb=document.getElementById('menuBtn'); if(mb) mb.setAttribute('aria-expanded','false'); if(wasOpen && drawerPrevFocus && drawerPrevFocus.focus){ try{ drawerPrevFocus.focus(); }catch(e){} drawerPrevFocus=null; } }
 document.getElementById('menuBtn').addEventListener('click',()=>sidebar.classList.contains('open')?closeDrawer():openDrawer());
 scrim.addEventListener('click',closeDrawer);
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && sidebar.classList.contains('open')) closeDrawer(); });
 
 /* ----- init ----- */
 (function init(){
